@@ -5,13 +5,14 @@ import com.jv.events.dto.EventResponseDTO;
 import com.jv.events.dto.EventUpdateDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.models.Event;
+import com.jv.events.util.DateUtil;
 
 public class EventMapper {
     
     public static Event toEntity(EventCreateDTO dto, ViaCepResponse viaCepResponse) {
         Event event = new Event();
         event.setEventName(dto.getEventName());
-        event.setDateTime(dto.getDateTime());
+        event.setEventDate(DateUtil.parseDate(dto.getEventDate()));
         event.setCep(viaCepResponse.getCep());
         event.setLogradouro(viaCepResponse.getLogradouro());
         event.setBairro(viaCepResponse.getBairro());
@@ -25,7 +26,7 @@ public class EventMapper {
         Event event = new Event();
         event.setId(existingEvent.getId());
         event.setEventName(dto.getEventName());
-        event.setDateTime(dto.getDateTime());
+        event.setEventDate(DateUtil.parseDate(dto.getEventDate()));
         event.setCep(viaCepResponse.getCep());
         event.setLogradouro(viaCepResponse.getLogradouro());
         event.setBairro(viaCepResponse.getBairro());
@@ -39,7 +40,7 @@ public class EventMapper {
         EventResponseDTO dto = new EventResponseDTO();
         dto.setId(event.getId());
         dto.setEventName(event.getEventName());
-        dto.setDateTime(event.getDateTime());
+        dto.setEventDate(DateUtil.formatDate(event.getEventDate()));
         dto.setCep(event.getCep());
         dto.setLogradouro(event.getLogradouro());
         dto.setBairro(event.getBairro());

@@ -5,8 +5,10 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.models.Event;
 import com.jv.events.repository.EventRepository;
+import com.jv.events.util.DateUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -16,29 +18,47 @@ public class EventService {
     private final EventRepository eventRepository;
 
     public Event createEvent(Event event) {
+        if (eventRepository.existsByEventNameIgnoreCase(event.getEventName())) {
+            throw new EventNameAlreadyExistsException(event.getEventName());
+        }
+
+        if (!DateUtil.isValidFutureDate(DateUtil.formatDate(event.getEventDate()))) {
+            throw new IllegalArgumentException("Event date must be in the future and in dd/MM/yyyy format");
+        }
+
         return eventRepository.save(event);
     }
-    
+
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
     }
-    
+
     public List<Event> getEventsByStatus(Boolean canceled) {
         if (canceled == null) {
             return eventRepository.findAll();
         }
         return eventRepository.findByCanceled(canceled);
     }
-    
+
+    public List<Event> searchEventsByName(String name) {
+        return eventRepository.findByEventNameContainingIgnoreCase(name);
+    }
+
     public Optional<Event> getEventById(String id) {
         return eventRepository.findById(id);
     }
-    
+
     public Event updateEvent(String id, Event updatedEvent) {
+        Optional<Event> existingEventWithSameName = eventRepository
+                .findByEventNameIgnoreCase(updatedEvent.getEventName());
+        if (existingEventWithSameName.isPresent() && !existingEventWithSameName.get().getId().equals(id)) {
+            throw new EventNameAlreadyExistsException(updatedEvent.getEventName());
+        }
+
         updatedEvent.setId(id);
         return eventRepository.save(updatedEvent);
     }
-    
+
     public Event cancelEvent(String id) {
         Optional<Event> eventOptional = getEventById(id);
         if (eventOptional.isPresent()) {
@@ -48,7 +68,7 @@ public class EventService {
         }
         return null;
     }
-    
+
     public Event reactivateEvent(String id) {
         Optional<Event> eventOptional = getEventById(id);
         if (eventOptional.isPresent()) {

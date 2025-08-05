@@ -10,14 +10,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class EventUpdateDTO {
-    
+
     @NotBlank
     @Size(min = 5, max = 100, message = "Event name must be between 5 and 100 characters")
     private String eventName;
 
-    @NotBlank
-    private String dateTime;
+    @NotBlank(message = "Date is required")
+    private String eventDate;
 
-    @NotBlank(message = "CEP é obrigatório")
+    @NotBlank(message = "ZIP code is required")
     private String cep;
 }
