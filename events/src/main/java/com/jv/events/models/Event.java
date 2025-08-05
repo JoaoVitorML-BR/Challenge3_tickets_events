@@ -23,8 +23,16 @@ public class Event implements Serializable {
     private String eventName;
     @Field("event_date_time")
     private String dateTime;
-    @Field("event_location")
-    private String location;
+    @Field("event_cep")
+    private String cep;
+    @Field("event_logradouro")
+    private String logradouro;
+    @Field("event_bairro")
+    private String bairro;
+    @Field("event_cidade")
+    private String cidade;
+    @Field("event_uf")
+    private String uf;
 
     @Field("event_canceled")
     private boolean canceled = false;
