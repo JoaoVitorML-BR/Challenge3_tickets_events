@@ -3,6 +3,8 @@ package com.jv.events.service;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.jv.events.exception.EventNameAlreadyExistsException;
@@ -29,6 +31,17 @@ public class EventService {
         return eventRepository.save(event);
     }
 
+    public Page<Event> getEventsPaginated(Boolean canceled, Pageable pageable) {
+        if (canceled == null) {
+            return eventRepository.findAll(pageable);
+        }
+        return eventRepository.findByCanceled(canceled, pageable);
+    }
+
+    public Page<Event> searchEventsByNamePaginated(String name, Pageable pageable) {
+        return eventRepository.findByEventNameContainingIgnoreCase(name, pageable);
+    }
+
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
     }
@@ -37,11 +50,11 @@ public class EventService {
         if (canceled == null) {
             return eventRepository.findAll();
         }
-        return eventRepository.findByCanceled(canceled);
+        return eventRepository.findByCanceled(canceled, Pageable.unpaged()).getContent();
     }
 
     public List<Event> searchEventsByName(String name) {
-        return eventRepository.findByEventNameContainingIgnoreCase(name);
+        return eventRepository.findByEventNameContainingIgnoreCase(name, Pageable.unpaged()).getContent();
     }
 
     public Optional<Event> getEventById(String id) {
