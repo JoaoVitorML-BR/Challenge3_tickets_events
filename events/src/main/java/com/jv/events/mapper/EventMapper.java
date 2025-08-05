@@ -2,6 +2,7 @@ package com.jv.events.mapper;
 
 import com.jv.events.dto.EventCreateDTO;
 import com.jv.events.dto.EventResponseDTO;
+import com.jv.events.dto.EventUpdateDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.models.Event;
 
@@ -17,6 +18,20 @@ public class EventMapper {
         event.setCidade(viaCepResponse.getLocalidade());
         event.setUf(viaCepResponse.getUf());
         event.setCanceled(false);
+        return event;
+    }
+    
+    public static Event toEntityForUpdate(EventUpdateDTO dto, ViaCepResponse viaCepResponse, Event existingEvent) {
+        Event event = new Event();
+        event.setId(existingEvent.getId());
+        event.setEventName(dto.getEventName());
+        event.setDateTime(dto.getDateTime());
+        event.setCep(viaCepResponse.getCep());
+        event.setLogradouro(viaCepResponse.getLogradouro());
+        event.setBairro(viaCepResponse.getBairro());
+        event.setCidade(viaCepResponse.getLocalidade());
+        event.setUf(viaCepResponse.getUf());
+        event.setCanceled(existingEvent.isCanceled());
         return event;
     }
     
