@@ -1,17 +1,17 @@
 package com.jv.events.dto;
 
-import lombok.Getter;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class EventResponseDTO {
-    
+
     private String id;
     private String eventName;
-    private String dateTime;
+    private String eventDate;
     private String cep;
     private String logradouro;
     private String bairro;
