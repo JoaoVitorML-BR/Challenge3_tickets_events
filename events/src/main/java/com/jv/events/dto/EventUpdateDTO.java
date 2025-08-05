@@ -9,11 +9,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-public class EventCreateDTO {
-    private String id;
+public class EventUpdateDTO {
 
     @NotBlank
-    @Size(min = 5, max = 100, message = "Event name must be between 3 and 100 characters")
+    @Size(min = 5, max = 100, message = "Event name must be between 5 and 100 characters")
     private String eventName;
 
     @NotBlank(message = "Date is required")

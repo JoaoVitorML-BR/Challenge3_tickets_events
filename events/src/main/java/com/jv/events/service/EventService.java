@@ -1,9 +1,16 @@
 package com.jv.events.service;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.models.Event;
 import com.jv.events.repository.EventRepository;
+import com.jv.events.util.DateUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -13,6 +20,75 @@ public class EventService {
     private final EventRepository eventRepository;
 
     public Event createEvent(Event event) {
+        if (eventRepository.existsByEventNameIgnoreCase(event.getEventName())) {
+            throw new EventNameAlreadyExistsException(event.getEventName());
+        }
+
+        if (!DateUtil.isValidFutureDate(DateUtil.formatDate(event.getEventDate()))) {
+            throw new IllegalArgumentException("Event date must be in the future and in dd/MM/yyyy format");
+        }
+
         return eventRepository.save(event);
+    }
+
+    public Page<Event> getEventsPaginated(Boolean canceled, Pageable pageable) {
+        if (canceled == null) {
+            return eventRepository.findAll(pageable);
+        }
+        return eventRepository.findByCanceled(canceled, pageable);
+    }
+
+    public Page<Event> searchEventsByNamePaginated(String name, Pageable pageable) {
+        return eventRepository.findByEventNameContainingIgnoreCase(name, pageable);
+    }
+
+    public List<Event> getAllEvents() {
+        return eventRepository.findAll();
+    }
+
+    public List<Event> getEventsByStatus(Boolean canceled) {
+        if (canceled == null) {
+            return eventRepository.findAll();
+        }
+        return eventRepository.findByCanceled(canceled, Pageable.unpaged()).getContent();
+    }
+
+    public List<Event> searchEventsByName(String name) {
+        return eventRepository.findByEventNameContainingIgnoreCase(name, Pageable.unpaged()).getContent();
+    }
+
+    public Optional<Event> getEventById(String id) {
+        return eventRepository.findById(id);
+    }
+
+    public Event updateEvent(String id, Event updatedEvent) {
+        Optional<Event> existingEventWithSameName = eventRepository
+                .findByEventNameIgnoreCase(updatedEvent.getEventName());
+        if (existingEventWithSameName.isPresent() && !existingEventWithSameName.get().getId().equals(id)) {
+            throw new EventNameAlreadyExistsException(updatedEvent.getEventName());
+        }
+
+        updatedEvent.setId(id);
+        return eventRepository.save(updatedEvent);
+    }
+
+    public Event cancelEvent(String id) {
+        Optional<Event> eventOptional = getEventById(id);
+        if (eventOptional.isPresent()) {
+            Event event = eventOptional.get();
+            event.setCanceled(true);
+            return eventRepository.save(event);
+        }
+        return null;
+    }
+
+    public Event reactivateEvent(String id) {
+        Optional<Event> eventOptional = getEventById(id);
+        if (eventOptional.isPresent()) {
+            Event event = eventOptional.get();
+            event.setCanceled(false);
+            return eventRepository.save(event);
+        }
+        return null;
     }
 }
