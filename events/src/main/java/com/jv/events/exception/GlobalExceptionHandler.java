@@ -57,6 +57,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
     
+    @ExceptionHandler(EventNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEventNotFound(EventNotFoundException ex, WebRequest request) {
+        logger.warn("Evento não encontrado: {}", ex.getMessage());
+        
+        ErrorResponseDTO error = new ErrorResponseDTO(
+            HttpStatus.NOT_FOUND.value(),
+            "Evento Não Encontrado",
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+    
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidation(MethodArgumentNotValidException ex, WebRequest request) {
         logger.warn("Erro de validação: {}", ex.getMessage());
