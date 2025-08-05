@@ -10,6 +10,7 @@ import com.jv.events.dto.EventUpdateDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.exception.CepInvalidoException;
 import com.jv.events.exception.EventCreationException;
+import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.exception.EventNotFoundException;
 import com.jv.events.exception.ViaCepApiException;
 import com.jv.events.mapper.EventMapper;
@@ -71,6 +72,21 @@ public class EventController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<EventResponseDTO>> searchEventsByName(
+            @RequestParam(value = "name", required = true) String name) {
+        try {
+            List<Event> events = eventService.searchEventsByName(name);
+            List<EventResponseDTO> response = events.stream()
+                    .map(EventMapper::toResponseDTO)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            throw new EventCreationException("Erro ao buscar eventos por nome", e);
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<EventResponseDTO> updateEvent(
             @PathVariable String id,
@@ -90,7 +106,7 @@ public class EventController {
             EventResponseDTO response = EventMapper.toResponseDTO(savedEvent);
 
             return ResponseEntity.ok(response);
-        } catch (EventNotFoundException | CepInvalidoException e) {
+        } catch (EventNotFoundException | CepInvalidoException | EventNameAlreadyExistsException e) {
             throw e;
         } catch (Exception e) {
             if (e.getMessage().contains("ViaCEP") || e.getMessage().contains("CEP")) {
@@ -105,11 +121,11 @@ public class EventController {
     public ResponseEntity<EventResponseDTO> cancelEvent(@PathVariable String id) {
         try {
             Event canceledEvent = eventService.cancelEvent(id);
-            
+
             if (canceledEvent == null) {
                 throw new EventNotFoundException(id);
             }
-            
+
             EventResponseDTO response = EventMapper.toResponseDTO(canceledEvent);
             return ResponseEntity.ok(response);
         } catch (EventNotFoundException e) {
@@ -123,11 +139,11 @@ public class EventController {
     public ResponseEntity<EventResponseDTO> reactivateEvent(@PathVariable String id) {
         try {
             Event reactivatedEvent = eventService.reactivateEvent(id);
-            
+
             if (reactivatedEvent == null) {
                 throw new EventNotFoundException(id);
             }
-            
+
             EventResponseDTO response = EventMapper.toResponseDTO(reactivatedEvent);
             return ResponseEntity.ok(response);
         } catch (EventNotFoundException e) {
@@ -153,7 +169,7 @@ public class EventController {
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
-        } catch (CepInvalidoException e) {
+        } catch (CepInvalidoException | EventNameAlreadyExistsException e) {
             throw e;
         } catch (Exception e) {
             if (e.getMessage().contains("ViaCEP") || e.getMessage().contains("CEP")) {
