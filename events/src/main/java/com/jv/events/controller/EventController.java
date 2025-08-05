@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -95,6 +96,42 @@ public class EventController {
             } else {
                 throw new EventCreationException("Falha ao atualizar evento", e);
             }
+        }
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<EventResponseDTO> cancelEvent(@PathVariable String id) {
+        try {
+            Event canceledEvent = eventService.cancelEvent(id);
+            
+            if (canceledEvent == null) {
+                throw new EventNotFoundException(id);
+            }
+            
+            EventResponseDTO response = EventMapper.toResponseDTO(canceledEvent);
+            return ResponseEntity.ok(response);
+        } catch (EventNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new EventCreationException("Erro ao cancelar evento", e);
+        }
+    }
+
+    @PatchMapping("/{id}/reactivate")
+    public ResponseEntity<EventResponseDTO> reactivateEvent(@PathVariable String id) {
+        try {
+            Event reactivatedEvent = eventService.reactivateEvent(id);
+            
+            if (reactivatedEvent == null) {
+                throw new EventNotFoundException(id);
+            }
+            
+            EventResponseDTO response = EventMapper.toResponseDTO(reactivatedEvent);
+            return ResponseEntity.ok(response);
+        } catch (EventNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new EventCreationException("Erro ao reativar evento", e);
         }
     }
 

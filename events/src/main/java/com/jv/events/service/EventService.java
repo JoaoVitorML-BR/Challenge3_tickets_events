@@ -31,4 +31,24 @@ public class EventService {
         updatedEvent.setId(id);
         return eventRepository.save(updatedEvent);
     }
+    
+    public Event cancelEvent(String id) {
+        Optional<Event> eventOptional = getEventById(id);
+        if (eventOptional.isPresent()) {
+            Event event = eventOptional.get();
+            event.setCanceled(true);
+            return eventRepository.save(event);
+        }
+        return null;
+    }
+    
+    public Event reactivateEvent(String id) {
+        Optional<Event> eventOptional = getEventById(id);
+        if (eventOptional.isPresent()) {
+            Event event = eventOptional.get();
+            event.setCanceled(false);
+            return eventRepository.save(event);
+        }
+        return null;
+    }
 }
