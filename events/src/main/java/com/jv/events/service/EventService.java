@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.models.Event;
 import com.jv.events.repository.EventRepository;
+import com.jv.events.util.DateUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +21,11 @@ public class EventService {
         if (eventRepository.existsByEventNameIgnoreCase(event.getEventName())) {
             throw new EventNameAlreadyExistsException(event.getEventName());
         }
+
+        if (!DateUtil.isValidFutureDate(DateUtil.formatDate(event.getEventDate()))) {
+            throw new IllegalArgumentException("Event date must be in the future and in dd/MM/yyyy format");
+        }
+
         return eventRepository.save(event);
     }
 
