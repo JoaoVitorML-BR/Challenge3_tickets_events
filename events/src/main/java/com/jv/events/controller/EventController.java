@@ -9,6 +9,7 @@ import com.jv.events.dto.EventResponseDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.exception.CepInvalidoException;
 import com.jv.events.exception.EventCreationException;
+import com.jv.events.exception.EventNotFoundException;
 import com.jv.events.exception.ViaCepApiException;
 import com.jv.events.mapper.EventMapper;
 import com.jv.events.models.Event;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -46,6 +48,21 @@ public class EventController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             throw new EventCreationException("Erro ao buscar eventos", e);
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<EventResponseDTO> getEventById(@PathVariable String id) {
+        try {
+            Event event = eventService.getEventById(id)
+                .orElseThrow(() -> new EventNotFoundException(id));
+            
+            EventResponseDTO response = EventMapper.toResponseDTO(event);
+            return ResponseEntity.ok(response);
+        } catch (EventNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new EventCreationException("Erro ao buscar evento", e);
         }
     }
 

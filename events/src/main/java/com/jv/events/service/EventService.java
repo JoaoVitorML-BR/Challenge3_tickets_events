@@ -1,6 +1,7 @@
 package com.jv.events.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
@@ -20,5 +21,9 @@ public class EventService {
     
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
+    }
+    
+    public Optional<Event> getEventById(String id) {
+        return eventRepository.findById(id);
     }
 }
