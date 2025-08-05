@@ -7,6 +7,7 @@ import com.jv.events.client.ViaCepClient;
 import com.jv.events.dto.EventCreateDTO;
 import com.jv.events.dto.EventResponseDTO;
 import com.jv.events.dto.EventUpdateDTO;
+import com.jv.events.dto.PagedEventResponseDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.exception.CepInvalidoException;
 import com.jv.events.exception.EventCreationException;
@@ -22,6 +23,10 @@ import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,17 +48,45 @@ public class EventController {
     private final ViaCepClient viaCepClient;
 
     @GetMapping
-    public ResponseEntity<List<EventResponseDTO>> getAllEvents(
-            @RequestParam(value = "canceled", required = false) Boolean canceled) {
+    public ResponseEntity<?> getAllEvents(
+            @RequestParam(value = "canceled", required = false) Boolean canceled,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
+            @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
         try {
-            List<Event> events = eventService.getEventsByStatus(canceled);
-            List<EventResponseDTO> response = events.stream()
-                    .map(EventMapper::toResponseDTO)
-                    .collect(Collectors.toList());
+            if (page != null) {
+                Sort.Direction sortDirection = Sort.Direction.fromString(direction);
+                Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+                
+                Page<Event> eventPage = eventService.getEventsPaginated(canceled, pageable);
+                
+                List<EventResponseDTO> events = eventPage.getContent().stream()
+                        .map(EventMapper::toResponseDTO)
+                        .collect(Collectors.toList());
+                
+                PagedEventResponseDTO response = new PagedEventResponseDTO(
+                        events,
+                        eventPage.getNumber(),
+                        eventPage.getTotalPages(),
+                        eventPage.getTotalElements(),
+                        eventPage.getSize(),
+                        eventPage.hasNext(),
+                        eventPage.hasPrevious()
+                );
+                
+                return ResponseEntity.ok(response);
+            } 
+            else {
+                List<Event> events = eventService.getEventsByStatus(canceled);
+                List<EventResponseDTO> response = events.stream()
+                        .map(EventMapper::toResponseDTO)
+                        .collect(Collectors.toList());
 
-            return ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
+            }
         } catch (Exception e) {
-            throw new EventCreationException("Erro ao buscar eventos", e);
+            throw new EventCreationException("Error when fetching events", e);
         }
     }
 
@@ -68,22 +101,50 @@ public class EventController {
         } catch (EventNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            throw new EventCreationException("Erro ao buscar evento", e);
+            throw new EventCreationException("Error when searching for event", e);
         }
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<EventResponseDTO>> searchEventsByName(
-            @RequestParam(value = "name", required = true) String name) {
+    public ResponseEntity<?> searchEventsByName(
+            @RequestParam(value = "name", required = true) String name,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
+            @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
         try {
-            List<Event> events = eventService.searchEventsByName(name);
-            List<EventResponseDTO> response = events.stream()
-                    .map(EventMapper::toResponseDTO)
-                    .collect(Collectors.toList());
+            if (page != null) {
+                Sort.Direction sortDirection = Sort.Direction.fromString(direction);
+                Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+                
+                Page<Event> eventPage = eventService.searchEventsByNamePaginated(name, pageable);
+                
+                List<EventResponseDTO> events = eventPage.getContent().stream()
+                        .map(EventMapper::toResponseDTO)
+                        .collect(Collectors.toList());
+                
+                PagedEventResponseDTO response = new PagedEventResponseDTO(
+                        events,
+                        eventPage.getNumber(),
+                        eventPage.getTotalPages(),
+                        eventPage.getTotalElements(),
+                        eventPage.getSize(),
+                        eventPage.hasNext(),
+                        eventPage.hasPrevious()
+                );
+                
+                return ResponseEntity.ok(response);
+            } 
+            else {
+                List<Event> events = eventService.searchEventsByName(name);
+                List<EventResponseDTO> response = events.stream()
+                        .map(EventMapper::toResponseDTO)
+                        .collect(Collectors.toList());
 
-            return ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
+            }
         } catch (Exception e) {
-            throw new EventCreationException("Erro ao buscar eventos por nome", e);
+            throw new EventCreationException("Error searching for events by name", e);
         }
     }
 
@@ -110,9 +171,9 @@ public class EventController {
             throw e;
         } catch (Exception e) {
             if (e.getMessage().contains("ViaCEP") || e.getMessage().contains("CEP")) {
-                throw new ViaCepApiException("Falha na comunicação com serviço de CEP", e);
+                throw new ViaCepApiException("Communication failure with CEP service", e);
             } else {
-                throw new EventCreationException("Falha ao atualizar evento", e);
+                throw new EventCreationException("Failed to update event", e);
             }
         }
     }
@@ -131,7 +192,7 @@ public class EventController {
         } catch (EventNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            throw new EventCreationException("Erro ao cancelar evento", e);
+            throw new EventCreationException("Error canceling event", e);
         }
     }
 
@@ -149,7 +210,7 @@ public class EventController {
         } catch (EventNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            throw new EventCreationException("Erro ao reativar evento", e);
+            throw new EventCreationException("Error reactivating event", e);
         }
     }
 
@@ -173,9 +234,9 @@ public class EventController {
             throw e;
         } catch (Exception e) {
             if (e.getMessage().contains("ViaCEP") || e.getMessage().contains("CEP")) {
-                throw new ViaCepApiException("Falha na comunicação com serviço de CEP", e);
+                throw new ViaCepApiException("Communication failure with CEP service", e);
             } else {
-                throw new EventCreationException("Falha ao processar dados do evento", e);
+                throw new EventCreationException("Failed to process event data", e);
             }
         }
     }
