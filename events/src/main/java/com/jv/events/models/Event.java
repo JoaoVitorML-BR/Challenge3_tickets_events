@@ -1,6 +1,7 @@
 package com.jv.events.models;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -21,8 +22,8 @@ public class Event implements Serializable {
     private String id;
     @Field("event_name")
     private String eventName;
-    @Field("event_date_time")
-    private String dateTime;
+    @Field("event_date")
+    private LocalDate eventDate;
     @Field("event_cep")
     private String cep;
     @Field("event_logradouro")
