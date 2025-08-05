@@ -1,5 +1,7 @@
 package com.jv.events.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import com.jv.events.models.Event;
@@ -14,5 +16,9 @@ public class EventService {
 
     public Event createEvent(Event event) {
         return eventRepository.save(event);
+    }
+    
+    public List<Event> getAllEvents() {
+        return eventRepository.findAll();
     }
 }

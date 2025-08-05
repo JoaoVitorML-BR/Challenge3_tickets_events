@@ -16,8 +16,12 @@ import com.jv.events.service.EventService;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -30,6 +34,20 @@ public class EventController {
     
     private final EventService eventService;
     private final ViaCepClient viaCepClient;
+
+    @GetMapping
+    public ResponseEntity<List<EventResponseDTO>> getAllEvents() {
+        try {
+            List<Event> events = eventService.getAllEvents();
+            List<EventResponseDTO> response = events.stream()
+                .map(EventMapper::toResponseDTO)
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            throw new EventCreationException("Erro ao buscar eventos", e);
+        }
+    }
 
     @PostMapping
     public ResponseEntity<EventResponseDTO> createEvent(@Valid @RequestBody EventCreateDTO eventCreateDTO) {
