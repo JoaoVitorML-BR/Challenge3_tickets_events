@@ -3,8 +3,14 @@ package com.jv.events.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jv.events.client.ViaCepClient;
 import com.jv.events.dto.EventCreateDTO;
 import com.jv.events.dto.EventResponseDTO;
+import com.jv.events.dto.ViaCepResponse;
+import com.jv.events.exception.CepInvalidoException;
+import com.jv.events.exception.EventCreationException;
+import com.jv.events.exception.ViaCepApiException;
+import com.jv.events.mapper.EventMapper;
 import com.jv.events.models.Event;
 import com.jv.events.service.EventService;
 
@@ -23,27 +29,32 @@ import jakarta.validation.Valid;
 public class EventController {
     
     private final EventService eventService;
+    private final ViaCepClient viaCepClient;
 
     @PostMapping
     public ResponseEntity<EventResponseDTO> createEvent(@Valid @RequestBody EventCreateDTO eventCreateDTO) {
+        
         try {
-            Event event = new Event();
-            event.setEventName(eventCreateDTO.getEventName());
-            event.setDateTime(eventCreateDTO.getDateTime());
-            event.setLocation(eventCreateDTO.getCep());
-            event.setCanceled(false);
+            ViaCepResponse viaCepResponse = viaCepClient.buscarCep(eventCreateDTO.getCep());
             
+            if (viaCepResponse.isErro()) {
+                throw new CepInvalidoException(eventCreateDTO.getCep());
+            }
+
+            Event event = EventMapper.toEntity(eventCreateDTO, viaCepResponse);
             Event savedEvent = eventService.createEvent(event);
+            EventResponseDTO response = EventMapper.toResponseDTO(savedEvent);
             
-            EventResponseDTO eventResponseDTO = new EventResponseDTO();
-            eventResponseDTO.setId(savedEvent.getId());
-            eventResponseDTO.setEventName(savedEvent.getEventName());
-            eventResponseDTO.setDateTime(savedEvent.getDateTime());
-            eventResponseDTO.setCep(savedEvent.getLocation());
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
             
-            return ResponseEntity.status(HttpStatus.CREATED).body(eventResponseDTO);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (CepInvalidoException e) {
+            throw e;
+        } catch (Exception e) {            
+            if (e.getMessage().contains("ViaCEP") || e.getMessage().contains("CEP")) {
+                throw new ViaCepApiException("Falha na comunicação com serviço de CEP", e);
+            } else {
+                throw new EventCreationException("Falha ao processar dados do evento", e);
+            }
         }
     }
 }
