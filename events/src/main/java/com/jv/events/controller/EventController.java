@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import jakarta.validation.Valid;
 
@@ -41,9 +42,10 @@ public class EventController {
     private final ViaCepClient viaCepClient;
 
     @GetMapping
-    public ResponseEntity<List<EventResponseDTO>> getAllEvents() {
+    public ResponseEntity<List<EventResponseDTO>> getAllEvents(
+            @RequestParam(value = "canceled", required = false) Boolean canceled) {
         try {
-            List<Event> events = eventService.getAllEvents();
+            List<Event> events = eventService.getEventsByStatus(canceled);
             List<EventResponseDTO> response = events.stream()
                     .map(EventMapper::toResponseDTO)
                     .collect(Collectors.toList());

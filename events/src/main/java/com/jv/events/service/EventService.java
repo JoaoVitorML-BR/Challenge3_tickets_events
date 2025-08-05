@@ -23,6 +23,13 @@ public class EventService {
         return eventRepository.findAll();
     }
     
+    public List<Event> getEventsByStatus(Boolean canceled) {
+        if (canceled == null) {
+            return eventRepository.findAll();
+        }
+        return eventRepository.findByCanceled(canceled);
+    }
+    
     public Optional<Event> getEventById(String id) {
         return eventRepository.findById(id);
     }
