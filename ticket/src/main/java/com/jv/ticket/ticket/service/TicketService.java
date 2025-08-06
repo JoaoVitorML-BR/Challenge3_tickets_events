@@ -5,8 +5,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jv.ticket.ticket.client.EventServiceClient;
+import com.jv.ticket.ticket.dto.EventDTO;
+import com.jv.ticket.ticket.dto.EventPageResponseDTO;
 import com.jv.ticket.ticket.dto.TicketCreateDTO;
 import com.jv.ticket.ticket.dto.TicketResponseDTO;
+import com.jv.ticket.ticket.exception.EventNotFoundException;
 import com.jv.ticket.ticket.mapper.TicketMapper;
 import com.jv.ticket.ticket.models.Ticket;
 import com.jv.ticket.ticket.repository.TicketRepository;
@@ -22,36 +26,60 @@ import lombok.extern.slf4j.Slf4j;
 public class TicketService {
     
     private final TicketRepository ticketRepository;
+    private final EventServiceClient eventServiceClient;
     
     @Transactional
     public TicketResponseDTO createTicket(TicketCreateDTO createDTO) {
         log.info("Creating ticket for customer: {} and event: {}", 
                 createDTO.getCustomerName(), createDTO.getEventName());
         
-        // Validar CPF
         CpfValidator.validateCpf(createDTO.getCpf());
         
-        // Obter ID do usuário autenticado
         String userId = getCurrentUserId();
         
-        // TODO: Validar se o evento existe no ms-event-manager
-        // TODO: Buscar dados completos do evento (endereço, data/hora)
+        EventDTO event = validateAndGetEvent(createDTO.getEventName());
         
-        // Converter DTO para entidade
-        Ticket ticket = TicketMapper.toEntity(createDTO, userId);
+        Ticket ticket = TicketMapper.toEntity(createDTO, userId, event);
         
-        // Salvar no banco
         Ticket savedTicket = ticketRepository.save(ticket);
         
         log.info("Ticket created successfully with ID: {}", savedTicket.getTicketId());
         
-        // Converter para DTO de resposta
         return TicketMapper.toResponseDTO(savedTicket);
     }
     
-    /**
-     * Obter ID do usuário autenticado
-     */
+    private EventDTO validateAndGetEvent(String eventName) {
+        try {
+            log.info("Validating event: {}", eventName);
+            
+            EventPageResponseDTO eventPage = eventServiceClient.getEvents(0, false, "eventName", "ASC");
+            
+            log.info("Event page response received: events={}, totalElements={}", 
+                    eventPage.getEvents() != null ? eventPage.getEvents().size() : "null", 
+                    eventPage.getTotalElements());
+            
+            if (eventPage.getEvents() == null || eventPage.getEvents().isEmpty()) {
+                throw new EventNotFoundException("No events found or event service returned empty response");
+            }
+            
+            EventDTO event = eventPage.getEvents().stream()
+                    .filter(e -> e.getEventName().equalsIgnoreCase(eventName))
+                    .findFirst()
+                    .orElseThrow(() -> new EventNotFoundException("Event '" + eventName + "' not found or is cancelled"));
+            
+            log.info("Event found: {} - ID: {} - Cancelled: {}", 
+                    event.getEventName(), event.getEventId(), event.isCanceled());
+            return event;
+            
+        } catch (Exception ex) {
+            log.error("Error validating event '{}': {}", eventName, ex.getMessage());
+            if (ex instanceof EventNotFoundException) {
+                throw ex;
+            }
+            throw new EventNotFoundException("Unable to validate event '" + eventName + "'. Please try again later.");
+        }
+    }
+    
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof JwtUserDetails) {
