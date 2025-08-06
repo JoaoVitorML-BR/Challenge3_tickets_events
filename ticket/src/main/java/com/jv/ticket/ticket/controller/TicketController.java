@@ -1,5 +1,6 @@
 package com.jv.ticket.ticket.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,14 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 public class TicketController {
     
     private final TicketService ticketService;
-    
-    @PostMapping("/create-ticket")
-    @PreAuthorize("hasRole('CLIENT') or hasRole('ADMIN')")
+
+    @PostMapping
+    @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<TicketResponseDTO> createTicket(@Valid @RequestBody TicketCreateDTO createDTO) {
-        log.info("Received request to create ticket for customer: {}", createDTO.getCustomerName());
-        
-        TicketResponseDTO responseDTO = ticketService.createTicket(createDTO);
-        
-        return ResponseEntity.status(201).body(responseDTO);
+        log.info("Creating new ticket for event: {}", createDTO.getEventName());
+        TicketResponseDTO ticket = ticketService.createTicket(createDTO);
+        log.info("Ticket created successfully with ID: {}", ticket.getTicketId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ticket);
     }
 }
