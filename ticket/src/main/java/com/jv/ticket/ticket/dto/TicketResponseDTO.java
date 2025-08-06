@@ -18,7 +18,6 @@ public class TicketResponseDTO {
     private String customerEmail;
     private EventDTO event;
     private BigDecimal brlTotalAmount;
-    private BigDecimal usdTotalAmount;
     private String status;
     
     @AllArgsConstructor

@@ -32,8 +32,4 @@ public class TicketCreateDTO {
     @NotNull(message = "BRL amount is required")
     @DecimalMin(value = "0.01", message = "BRL amount must be greater than 0")
     private BigDecimal brlAmount;
-    
-    @NotNull(message = "USD amount is required")
-    @DecimalMin(value = "0.01", message = "USD amount must be greater than 0")
-    private BigDecimal usdAmount;
 }
