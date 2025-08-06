@@ -1,4 +1,4 @@
-package com.jv.ticket.user.exception;
+package com.jv.ticket.exception;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -9,6 +9,18 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.jv.ticket.ticket.exception.EventNotFoundException;
+import com.jv.ticket.ticket.exception.EventServiceUnavailableException;
+import com.jv.ticket.ticket.exception.InvalidCpfException;
+import com.jv.ticket.ticket.exception.TicketAlreadyCancelledException;
+import com.jv.ticket.ticket.exception.TicketNotFoundException;
+import com.jv.ticket.ticket.exception.UnauthorizedTicketAccessException;
+import com.jv.ticket.user.exception.EmailUniqueViolationException;
+import com.jv.ticket.user.exception.EmptyDataException;
+import com.jv.ticket.user.exception.UserNotFoundException;
+import com.jv.ticket.user.exception.UsernameUniqueViolationException;
+import com.jv.ticket.user.exception.WrongPasswordException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,6 +56,8 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
+
+    // ========== USER EXCEPTIONS ==========
 
     @ExceptionHandler(UsernameUniqueViolationException.class)
     public ResponseEntity<Map<String, Object>> handleUsernameUniqueViolation(UsernameUniqueViolationException ex) {
@@ -99,6 +113,76 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+
+    // ========== TICKET EXCEPTIONS ==========
+
+    @ExceptionHandler(TicketNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleTicketNotFound(TicketNotFoundException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Ticket not found: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(EventNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleEventNotFound(EventNotFoundException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Event not found: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(TicketAlreadyCancelledException.class)
+    public ResponseEntity<Map<String, Object>> handleTicketAlreadyCancelled(TicketAlreadyCancelledException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Ticket already cancelled: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(InvalidCpfException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCpf(InvalidCpfException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Invalid CPF: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(EventServiceUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleEventServiceUnavailable(EventServiceUnavailableException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Event service unavailable: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
+    @ExceptionHandler(UnauthorizedTicketAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedTicketAccess(UnauthorizedTicketAccessException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+        
+        log.error("Unauthorized ticket access: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    // ========== GENERIC EXCEPTION ==========
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
