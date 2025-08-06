@@ -7,6 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.jv.ticket.user.dto.UserCreateDTO;
 import com.jv.ticket.user.dto.UserResponseDTO;
+import com.jv.ticket.user.dto.UserUpdateDTO;
 import com.jv.ticket.user.mapper.UserMapper;
 import com.jv.ticket.user.models.User;
 import com.jv.ticket.user.service.UserService;
@@ -48,5 +50,14 @@ public class UserController {
         Page<User> usersPage = userService.getAllUsers(pageable);
         Page<UserResponseDTO> responsePage = usersPage.map(UserMapper::toResponseDTO);
         return ResponseEntity.ok(responsePage);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') OR ( hasRole('CLIENT') AND #id == authentication.principal.id)")
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id,
+            @Valid @RequestBody UserUpdateDTO updateDTO) {
+        User updatedUser = userService.updateUser(id, updateDTO);
+        UserResponseDTO responseDTO = UserMapper.toResponseDTO(updatedUser);
+        return ResponseEntity.ok(responseDTO);
     }
 }
