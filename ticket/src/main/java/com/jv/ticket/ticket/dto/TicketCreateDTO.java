@@ -26,9 +26,6 @@ public class TicketCreateDTO {
     @Email(message = "Invalid email format")
     private String customerEmail;
     
-    @NotBlank(message = "Event ID is required")
-    private String eventId;
-    
     @NotBlank(message = "Event name is required")
     private String eventName;
     
