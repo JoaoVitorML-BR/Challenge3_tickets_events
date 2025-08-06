@@ -1,42 +1,44 @@
 package com.jv.ticket.ticket.mapper;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
+import com.jv.ticket.ticket.dto.EventDTO;
 import com.jv.ticket.ticket.dto.TicketCreateDTO;
 import com.jv.ticket.ticket.dto.TicketResponseDTO;
 import com.jv.ticket.ticket.models.Ticket;
 
 public class TicketMapper {
-    
-    /**
-     * Converte TicketCreateDTO para Ticket entity
-     */
-    public static Ticket toEntity(TicketCreateDTO dto, String userId) {
+    public static Ticket toEntity(TicketCreateDTO dto, String userId, EventDTO event) {
         if (dto == null) {
             return null;
         }
         
         Ticket ticket = new Ticket();
-        ticket.setTicketId(UUID.randomUUID().toString());
         ticket.setCustomerName(dto.getCustomerName().trim());
         ticket.setCpf(dto.getCpf().trim());
         ticket.setCustomerEmail(dto.getCustomerEmail().trim());
-        ticket.setEventId(dto.getEventId().trim());
-        ticket.setEventName(dto.getEventName().trim());
+        ticket.setEventId(event.getEventId());
+        ticket.setEventName(event.getEventName());
+        ticket.setEventDateTime(event.getEventDate());
         ticket.setBrlAmount(dto.getBrlAmount());
-        ticket.setUsdAmount(dto.getUsdAmount());
         ticket.setUserId(userId);
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
         ticket.setStatus(Ticket.TicketStatus.ACTIVE);
         
+        if (event.getAddress() != null) {
+            Ticket.EventAddress eventAddress = new Ticket.EventAddress();
+            eventAddress.setLogradouro(event.getAddress().getStreet() + ", " + event.getAddress().getNumber());
+            eventAddress.setBairro(event.getAddress().getNeighborhood());
+            eventAddress.setCidade(event.getAddress().getCity());
+            eventAddress.setUf(event.getAddress().getState());
+            eventAddress.setCep(event.getAddress().getZipCode());
+            ticket.setEventAddress(eventAddress);
+        }
+        
         return ticket;
     }
     
-    /**
-     * Converte Ticket entity para TicketResponseDTO
-     */
     public static TicketResponseDTO toResponseDTO(Ticket ticket) {
         if (ticket == null) {
             return null;
@@ -48,10 +50,8 @@ public class TicketMapper {
         dto.setCustomerName(ticket.getCustomerName());
         dto.setCustomerEmail(ticket.getCustomerEmail());
         dto.setBrlTotalAmount(ticket.getBrlAmount());
-        dto.setUsdTotalAmount(ticket.getUsdAmount());
         dto.setStatus(ticket.getStatus().getDescription());
         
-        // Criar DTO do evento
         if (ticket.getEventAddress() != null) {
             TicketResponseDTO.EventDTO eventDTO = new TicketResponseDTO.EventDTO();
             eventDTO.setEventId(ticket.getEventId());
