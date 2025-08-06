@@ -45,9 +45,6 @@ public class Ticket implements Serializable {
     @Field("brl_amount")
     private BigDecimal brlAmount;
     
-    @Field("usd_amount")
-    private BigDecimal usdAmount;
-    
     @Field("status")
     private TicketStatus status = TicketStatus.ACTIVE;
     
