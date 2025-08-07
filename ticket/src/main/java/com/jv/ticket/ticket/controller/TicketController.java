@@ -28,6 +28,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -69,6 +70,13 @@ public class TicketController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TicketResponseDTO>> getTicketsByStatus(@PathVariable Ticket.TicketStatus status) {
         List<TicketResponseDTO> tickets = ticketService.getTicketsByStatus(status);
+        return ResponseEntity.ok(tickets);
+    }
+
+    @GetMapping("/cpf/{cpf}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<TicketResponseDTO>> getTicketsByCpf(@PathVariable String cpf) {
+        List<TicketResponseDTO> tickets = ticketService.getTicketsByCpf(cpf);
         return ResponseEntity.ok(tickets);
     }
 

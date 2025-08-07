@@ -146,4 +146,10 @@ public class TicketService {
         
         return TicketMapper.toResponseDTO(savedTicket);
     }
+
+    public List<TicketResponseDTO> getTicketsByCpf(String cpf) {
+        return ticketRepository.findByCpf(cpf).stream()
+                .map(TicketMapper::toResponseDTO)
+                .toList();
+    }
 }
