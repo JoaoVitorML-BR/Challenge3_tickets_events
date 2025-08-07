@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.jv.events.client.TicketServiceClient;
+import com.jv.events.dto.TicketCheckResponseDTO;
 import com.jv.events.exception.EventCancellationNotAllowedException;
 import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.models.Event;
@@ -78,30 +79,31 @@ public class EventService {
     }
 
     public Event cancelEvent(String id) {
-        log.info("Attempting to cancel event with ID: {}", id);
-        
         Optional<Event> eventOptional = getEventById(id);
         if (eventOptional.isPresent()) {
             Event event = eventOptional.get();
-            
+
             try {
-                log.info("Checking if event {} has tickets before cancellation", id);
-                Boolean hasTickets = ticketServiceClient.hasTicketsForEvent(id);
-                
-                if (hasTickets != null && hasTickets) {
-                    Long ticketCount = ticketServiceClient.getTicketCountForEvent(id);
-                    log.warn("Cannot cancel event {} - it has {} tickets", id, ticketCount);
-                    throw new EventCancellationNotAllowedException(id, ticketCount != null ? ticketCount : 0);
+                TicketCheckResponseDTO ticketCheck = ticketServiceClient.checkActiveTicketsForEvent(id);
+                if (ticketCheck.isHasTickets() && ticketCheck.getActiveTicketCount() > 0) {
+                    throw new EventCancellationNotAllowedException(id, ticketCheck.getActiveTicketCount());
                 }
-                
-                log.info("Event {} has no tickets, proceeding with cancellation", id);
+
+                if (ticketCheck.getTotalTicketCount() > 0 && ticketCheck.getActiveTicketCount() == 0) {
+                    log.info("Event {} has {} total tickets but all are cancelled. Proceeding with event cancellation.",
+                            id, ticketCheck.getTotalTicketCount());
+                } else {
+                    log.info("Event {} has no tickets, proceeding with cancellation", id);
+                }
+
             } catch (EventCancellationNotAllowedException e) {
                 throw e;
             } catch (Exception e) {
-                log.warn("Failed to check tickets for event {}: {}. Proceeding with cancellation due to fallback.", 
+                log.warn("Failed to check tickets for event {}: {}. Proceeding with cancellation due to fallback.",
                         id, e.getMessage());
+                throw new RuntimeException("Failed to check tickets for event " + id + ": " + e.getMessage());
             }
-            
+
             event.setCanceled(true);
             Event savedEvent = eventRepository.save(event);
             log.info("Event {} canceled successfully", id);
