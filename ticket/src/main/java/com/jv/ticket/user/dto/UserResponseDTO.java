@@ -13,5 +13,6 @@ public class UserResponseDTO {
     private String id;
     private String username;
     private String email;
+    private String cpf;
     private User.Role role;
 }

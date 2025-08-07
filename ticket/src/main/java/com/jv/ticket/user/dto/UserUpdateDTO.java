@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import org.hibernate.validator.constraints.br.CPF;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -17,6 +19,9 @@ public class UserUpdateDTO {
 
     @Email(message = "Invalid Format for Email")
     private String email;
+
+    @CPF
+    private String cpf;
 
     @NotBlank(message = "Password is required to confirm changes")
     private String currentPassword;

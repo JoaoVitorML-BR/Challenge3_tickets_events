@@ -9,6 +9,7 @@ import com.jv.ticket.user.models.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.br.CPF;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -25,6 +26,10 @@ public class UserCreateDTO {
     @NotBlank(message = "Password is required")
     @Size(min = 6, max=25, message = "Password must be between 6 and 25 characters")
     private String password;
+
+    @NotBlank(message = "CPF is required")
+    @CPF(message = "Invalid CPF format")
+    private String cpf;
     
     private User.Role role;
 }
