@@ -28,7 +28,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -73,13 +72,6 @@ public class TicketController {
         return ResponseEntity.ok(tickets);
     }
 
-    @GetMapping("/cpf/{cpf}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<TicketResponseDTO>> getTicketsByCpf(@PathVariable String cpf) {
-        List<TicketResponseDTO> tickets = ticketService.getTicketsByCpf(cpf);
-        return ResponseEntity.ok(tickets);
-    }
-
     @PutMapping("/{ticketId}/cancel")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<TicketResponseDTO> cancelTicket(@PathVariable String ticketId) {
@@ -87,4 +79,9 @@ public class TicketController {
         return ResponseEntity.ok(cancelledTicket);
     }
 
+    @GetMapping("/cpf/{cpf}")
+    public ResponseEntity<List<TicketResponseDTO>> getTicketByCpf(@PathVariable String cpf) {
+        List<TicketResponseDTO> tickets = ticketService.getTicketsByCpf(cpf);
+        return ResponseEntity.ok(tickets);
+    }
 }
