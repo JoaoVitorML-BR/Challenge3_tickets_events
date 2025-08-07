@@ -16,6 +16,7 @@ import com.jv.ticket.ticket.exception.InvalidCpfException;
 import com.jv.ticket.ticket.exception.TicketAlreadyCancelledException;
 import com.jv.ticket.ticket.exception.TicketNotFoundException;
 import com.jv.ticket.ticket.exception.UnauthorizedTicketAccessException;
+import com.jv.ticket.user.exception.CpfViolationException;
 import com.jv.ticket.user.exception.EmailUniqueViolationException;
 import com.jv.ticket.user.exception.EmptyDataException;
 import com.jv.ticket.user.exception.UserNotFoundException;
@@ -32,17 +33,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
         Map<String, Object> response = new HashMap<>();
         Map<String, String> errors = new HashMap<>();
-        
+
         ex.getBindingResult().getFieldErrors().forEach(error -> {
             errors.put(error.getField(), error.getDefaultMessage());
         });
-        
+
         response.put("status", "error");
         response.put("message", "Validation failed");
         response.put("errors", errors);
-        
+
         log.error("Validation error: {}", errors);
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -51,9 +52,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", "Access denied. You can only access your own user information.");
-        
+
         log.error("Authorization denied: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
@@ -64,9 +65,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Username unique violation: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
@@ -75,9 +76,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Email unique violation: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
@@ -86,9 +87,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("User not found: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
@@ -97,9 +98,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Wrong password: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -108,9 +109,20 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Empty data: {}", ex.getMessage());
-        
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(CpfViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleCpfViolation(CpfViolationException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+
+        log.error("CPF violation: {}", ex.getMessage());
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -121,9 +133,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Ticket not found: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
@@ -132,9 +144,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Event not found: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
@@ -143,9 +155,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Ticket already cancelled: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
@@ -154,9 +166,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Invalid CPF: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -165,9 +177,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Event service unavailable: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }
 
@@ -176,9 +188,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", ex.getMessage());
-        
+
         log.error("Unauthorized ticket access: {}", ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
@@ -189,9 +201,9 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
         response.put("message", "An unexpected error occurred");
-        
+
         log.error("Unexpected error: {}", ex.getMessage(), ex);
-        
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

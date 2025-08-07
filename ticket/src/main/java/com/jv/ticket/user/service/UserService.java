@@ -8,6 +8,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jv.ticket.user.exception.CpfViolationException;
 import com.jv.ticket.user.exception.EmailUniqueViolationException;
 import com.jv.ticket.user.exception.EmptyDataException;
 import com.jv.ticket.user.exception.UserNotFoundException;
@@ -17,6 +18,7 @@ import com.jv.ticket.user.dto.UserUpdateDTO;
 import com.jv.ticket.user.mapper.UserMapper;
 import com.jv.ticket.user.models.User;
 import com.jv.ticket.user.repository.UserRepository;
+import com.jv.ticket.ticket.util.CpfValidator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,9 +34,22 @@ public class UserService {
                     user.getUsername()));
         }
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-            throw new UsernameUniqueViolationException(String.format("Email '%s' is already in use",
+            throw new EmailUniqueViolationException(String.format("Email '%s' is already in use",
                     user.getEmail()));
         }
+        if (user.getCpf() == null || user.getCpf().isBlank()) {
+            throw new CpfViolationException("CPF cannot be empty or blank.");
+        }
+        
+        // Validar formato do CPF usando CpfValidator
+        CpfValidator.validateCpf(user.getCpf());
+        user.setCpf(CpfValidator.formatCpf(user.getCpf()));
+        
+        // Verificar se CPF já existe
+        if (userRepository.findByCpf(user.getCpf()).isPresent()) {
+            throw new CpfViolationException(String.format("CPF '%s' is already in use", user.getCpf()));
+        }
+        
         String encodedPassword = passwordEncoder.encode(user.getPassword());
         user.setPassword(encodedPassword);
         return userRepository.save(user);
@@ -93,6 +108,22 @@ public class UserService {
             }
             userToUpdate.setEmail(emailTrimmed);
         }
+
+        if (userUpdateDTO.getCpf() != null) {
+            String cpfTrimmed = userUpdateDTO.getCpf().trim();
+            if (cpfTrimmed.isBlank()) {
+                throw new EmptyDataException("CPF cannot be empty or blank.");
+            }
+            
+            CpfValidator.validateCpf(cpfTrimmed);
+            String formattedCpf = CpfValidator.formatCpf(cpfTrimmed);
+            
+            Optional<User> existingUserWithCpf = userRepository.findByCpf(formattedCpf);
+            if (existingUserWithCpf.isPresent() && !existingUserWithCpf.get().getId().equals(id)) {
+                throw new CpfViolationException("CPF '" + cpfTrimmed + "' is already in use.");
+            }
+            userToUpdate.setCpf(formattedCpf);
+        }
         return userRepository.save(userToUpdate);
     }
 
@@ -132,6 +163,13 @@ public class UserService {
     public User getUserById(String id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public User getUserByCpf(String cpf) {
+        String formattedCpf = CpfValidator.formatCpf(cpf);
+        return userRepository.findByCpf(formattedCpf)
+                .orElseThrow(() -> new UserNotFoundException("User not found with CPF: " + cpf));
     }
 
     @Transactional(readOnly = true)

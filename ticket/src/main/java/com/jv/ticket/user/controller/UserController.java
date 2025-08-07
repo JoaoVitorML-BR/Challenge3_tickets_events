@@ -44,6 +44,14 @@ public class UserController {
         return ResponseEntity.ok(responseDTO);
     }
 
+    @GetMapping("/cpf/{cpf}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDTO> getUserByCpf(@PathVariable String cpf) {
+        User user = userService.getUserByCpf(cpf);
+        UserResponseDTO responseDTO = UserMapper.toResponseDTO(user);
+        return ResponseEntity.ok(responseDTO);
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<UserResponseDTO>> getAllUsers(Pageable pageable) {
