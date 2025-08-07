@@ -79,4 +79,9 @@ public class TicketController {
         return ResponseEntity.ok(cancelledTicket);
     }
 
+    @GetMapping("/cpf/{cpf}")
+    public ResponseEntity<List<TicketResponseDTO>> getTicketByCpf(@PathVariable String cpf) {
+        List<TicketResponseDTO> tickets = ticketService.getTicketsByCpf(cpf);
+        return ResponseEntity.ok(tickets);
+    }
 }
