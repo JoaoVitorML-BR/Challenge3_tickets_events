@@ -28,6 +28,9 @@ public class User implements Serializable {
     @Field("password")
     private String password;
 
+    @Field("cpf")
+    private String cpf;
+
     @Field("role")
     private Role role = Role.ROLE_CLIENT;
 
