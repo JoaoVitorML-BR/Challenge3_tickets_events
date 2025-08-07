@@ -10,7 +10,7 @@ import com.jv.ticket.user.models.User;
 public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
-    Optional<User> findById(String id);
+    Optional<User> findByCpf(String cpf);
 
     @Query("SELECT u.role FROM User u WHERE u.username = :username")
     User.Role findRoleByUsername(String username);
