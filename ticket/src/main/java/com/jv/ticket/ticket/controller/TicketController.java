@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.jv.ticket.ticket.dto.TicketCreateDTO;
 import com.jv.ticket.ticket.dto.TicketResponseDTO;
+import com.jv.ticket.ticket.dto.TicketCheckResponseDTO;
 import com.jv.ticket.ticket.service.TicketService;
 
 import jakarta.validation.Valid;
@@ -29,26 +30,26 @@ public class TicketController {
     @PostMapping
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<TicketResponseDTO> createTicket(@Valid @RequestBody TicketCreateDTO createDTO) {
-        log.info("Creating new ticket for event: {}", createDTO.getEventName());
         TicketResponseDTO ticket = ticketService.createTicket(createDTO);
-        log.info("Ticket created successfully with ID: {}", ticket.getTicketId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ticket);
     }
 
     @GetMapping("/event/{eventId}/exists")
     public ResponseEntity<Boolean> hasTicketsForEvent(@PathVariable String eventId) {
-        log.info("Checking if tickets exist for event: {}", eventId);
         boolean hasTickets = ticketService.hasTicketsForEvent(eventId);
-        log.info("Event {} has tickets: {}", eventId, hasTickets);
         return ResponseEntity.ok(hasTickets);
     }
 
     @GetMapping("/event/{eventId}/count")
     public ResponseEntity<Long> getTicketCountForEvent(@PathVariable String eventId) {
-        log.info("Getting ticket count for event: {}", eventId);
         long count = ticketService.getTicketCountForEvent(eventId);
-        log.info("Event {} has {} tickets", eventId, count);
         return ResponseEntity.ok(count);
+    }
+
+    @GetMapping("/event/{eventId}/active-check")
+    public ResponseEntity<TicketCheckResponseDTO> checkActiveTicketsForEvent(@PathVariable String eventId) {
+        TicketCheckResponseDTO response = ticketService.checkActiveTicketsForEvent(eventId);
+        return ResponseEntity.ok(response);
     }
 
 }
