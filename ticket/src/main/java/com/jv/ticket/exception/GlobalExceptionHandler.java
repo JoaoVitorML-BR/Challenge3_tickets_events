@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.jv.ticket.ticket.exception.EventNotFoundException;
 import com.jv.ticket.ticket.exception.EventServiceUnavailableException;
 import com.jv.ticket.ticket.exception.InvalidCpfException;
+import com.jv.ticket.ticket.exception.CpfMismatchException;
 import com.jv.ticket.ticket.exception.TicketAlreadyCancelledException;
 import com.jv.ticket.ticket.exception.TicketNotFoundException;
 import com.jv.ticket.ticket.exception.UnauthorizedTicketAccessException;
@@ -168,6 +169,17 @@ public class GlobalExceptionHandler {
         response.put("message", ex.getMessage());
 
         log.error("Invalid CPF: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(CpfMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleCpfMismatch(CpfMismatchException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", ex.getMessage());
+
+        log.error("CPF mismatch: {}", ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }

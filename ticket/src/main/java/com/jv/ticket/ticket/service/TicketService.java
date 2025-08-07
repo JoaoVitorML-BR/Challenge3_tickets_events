@@ -20,6 +20,7 @@ import com.jv.ticket.ticket.exception.EventNotFoundException;
 import com.jv.ticket.ticket.exception.TicketNotFoundException;
 import com.jv.ticket.ticket.exception.TicketAlreadyCancelledException;
 import com.jv.ticket.ticket.exception.UnauthorizedTicketAccessException;
+import com.jv.ticket.ticket.exception.CpfMismatchException;
 import com.jv.ticket.ticket.mapper.TicketMapper;
 import com.jv.ticket.ticket.models.Ticket;
 import com.jv.ticket.ticket.repository.TicketRepository;
@@ -42,6 +43,15 @@ public class TicketService {
         CpfValidator.validateCpf(createDTO.getCpf());
 
         String userId = getCurrentUserId();
+        String userCpf = getCurrentUserCpf();
+        
+        String formattedInputCpf = CpfValidator.formatCpf(createDTO.getCpf());
+        String formattedUserCpf = CpfValidator.formatCpf(userCpf);
+        
+        if (!formattedInputCpf.equals(formattedUserCpf)) {
+            throw new CpfMismatchException("The provided CPF does not match your registered CPF");
+        }
+        
         EventDTO event = validateAndGetEvent(createDTO.getEventName());
         Ticket ticket = TicketMapper.toEntity(createDTO, userId, event);
         Ticket savedTicket = ticketRepository.save(ticket);
@@ -77,6 +87,15 @@ public class TicketService {
         if (authentication != null && authentication.getPrincipal() instanceof JwtUserDetails) {
             JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
             return userDetails.getId();
+        }
+        throw new RuntimeException("User not authenticated");
+    }
+
+    private String getCurrentUserCpf() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof JwtUserDetails) {
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            return userDetails.getCpf();
         }
         throw new RuntimeException("User not authenticated");
     }
