@@ -84,7 +84,7 @@ public class EventService {
             Event event = eventOptional.get();
 
             try {
-                TicketCheckResponseDTO ticketCheck = ticketServiceClient.checkActiveTicketsForEvent(id);
+                TicketCheckResponseDTO ticketCheck = ticketServiceClient.checkTicketsForEvent(id);
                 if (ticketCheck.isHasTickets() && ticketCheck.getActiveTicketCount() > 0) {
                     throw new EventCancellationNotAllowedException(id, ticketCheck.getActiveTicketCount());
                 }
@@ -99,17 +99,13 @@ public class EventService {
             } catch (EventCancellationNotAllowedException e) {
                 throw e;
             } catch (Exception e) {
-                log.warn("Failed to check tickets for event {}: {}. Proceeding with cancellation due to fallback.",
-                        id, e.getMessage());
                 throw new RuntimeException("Failed to check tickets for event " + id + ": " + e.getMessage());
             }
 
             event.setCanceled(true);
             Event savedEvent = eventRepository.save(event);
-            log.info("Event {} canceled successfully", id);
             return savedEvent;
         }
-        log.warn("Event with ID {} not found for cancellation", id);
         return null;
     }
 
