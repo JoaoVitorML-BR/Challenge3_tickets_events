@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/tickets/events").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/exists").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/count").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/active-check").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(
