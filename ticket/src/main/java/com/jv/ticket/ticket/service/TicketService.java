@@ -24,53 +24,54 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class TicketService {
-    
+
     private final TicketRepository ticketRepository;
     private final EventServiceClient eventServiceClient;
-    
+
     @Transactional
     public TicketResponseDTO createTicket(TicketCreateDTO createDTO) {
-        log.info("Creating ticket for customer: {} and event: {}", 
+        log.info("Creating ticket for customer: {} and event: {}",
                 createDTO.getCustomerName(), createDTO.getEventName());
-        
+
         CpfValidator.validateCpf(createDTO.getCpf());
-        
+
         String userId = getCurrentUserId();
-        
+
         EventDTO event = validateAndGetEvent(createDTO.getEventName());
-        
+
         Ticket ticket = TicketMapper.toEntity(createDTO, userId, event);
-        
+
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+
         log.info("Ticket created successfully with ID: {}", savedTicket.getTicketId());
-        
+
         return TicketMapper.toResponseDTO(savedTicket);
     }
-    
+
     private EventDTO validateAndGetEvent(String eventName) {
         try {
             log.info("Validating event: {}", eventName);
-            
+
             EventPageResponseDTO eventPage = eventServiceClient.getEvents(0, false, "eventName", "ASC");
-            
-            log.info("Event page response received: events={}, totalElements={}", 
-                    eventPage.getEvents() != null ? eventPage.getEvents().size() : "null", 
+
+            log.info("Event page response received: events={}, totalElements={}",
+                    eventPage.getEvents() != null ? eventPage.getEvents().size() : "null",
                     eventPage.getTotalElements());
-            
+
             if (eventPage.getEvents() == null || eventPage.getEvents().isEmpty()) {
                 throw new EventNotFoundException("No events found or event service returned empty response");
             }
-            
+
             EventDTO event = eventPage.getEvents().stream()
                     .filter(e -> e.getEventName().equalsIgnoreCase(eventName))
                     .findFirst()
-                    .orElseThrow(() -> new EventNotFoundException("Event '" + eventName + "' not found or is cancelled"));
-            
-            log.info("Event found: {} - ID: {} - Cancelled: {}", 
+                    .orElseThrow(
+                            () -> new EventNotFoundException("Event '" + eventName + "' not found or is cancelled"));
+
+            log.info("Event found: {} - ID: {} - Cancelled: {}",
                     event.getEventName(), event.getEventId(), event.isCanceled());
             return event;
-            
+
         } catch (Exception ex) {
             log.error("Error validating event '{}': {}", eventName, ex.getMessage());
             if (ex instanceof EventNotFoundException) {
@@ -79,7 +80,7 @@ public class TicketService {
             throw new EventNotFoundException("Unable to validate event '" + eventName + "'. Please try again later.");
         }
     }
-    
+
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof JwtUserDetails) {
@@ -87,5 +88,15 @@ public class TicketService {
             return userDetails.getId();
         }
         throw new RuntimeException("User not authenticated");
+    }
+
+    public boolean hasTicketsForEvent(String eventId) {
+        log.info("Checking if tickets exist for event: {}", eventId);
+        return ticketRepository.existsByEventId(eventId);
+    }
+
+    public long getTicketCountForEvent(String eventId) {
+        log.info("Counting tickets for event: {}", eventId);
+        return ticketRepository.countByEventId(eventId);
     }
 }
