@@ -15,6 +15,7 @@ public class UserMapper {
         user.setUsername(dto.getUsername().trim());
         user.setEmail(dto.getEmail().trim());
         user.setPassword(dto.getPassword());
+        user.setCpf(dto.getCpf().trim());
         user.setRole(dto.getRole() != null ? dto.getRole() : User.Role.ROLE_CLIENT);
         return user;
     }
@@ -28,6 +29,7 @@ public class UserMapper {
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
+        dto.setCpf(user.getCpf());
         dto.setRole(user.getRole());
         return dto;
     }
@@ -43,6 +45,10 @@ public class UserMapper {
 
         if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()) {
             user.setEmail(dto.getEmail().trim());
+        }
+
+        if (dto.getCpf() != null && !dto.getCpf().trim().isEmpty()) {
+            user.setCpf(dto.getCpf().trim());
         }
     }
 }
