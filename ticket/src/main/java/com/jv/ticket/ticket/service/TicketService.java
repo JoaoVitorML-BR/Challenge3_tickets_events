@@ -10,6 +10,7 @@ import com.jv.ticket.ticket.dto.EventDTO;
 import com.jv.ticket.ticket.dto.EventPageResponseDTO;
 import com.jv.ticket.ticket.dto.TicketCreateDTO;
 import com.jv.ticket.ticket.dto.TicketResponseDTO;
+import com.jv.ticket.ticket.dto.TicketCheckResponseDTO;
 import com.jv.ticket.ticket.exception.EventNotFoundException;
 import com.jv.ticket.ticket.mapper.TicketMapper;
 import com.jv.ticket.ticket.models.Ticket;
@@ -30,9 +31,6 @@ public class TicketService {
 
     @Transactional
     public TicketResponseDTO createTicket(TicketCreateDTO createDTO) {
-        log.info("Creating ticket for customer: {} and event: {}",
-                createDTO.getCustomerName(), createDTO.getEventName());
-
         CpfValidator.validateCpf(createDTO.getCpf());
 
         String userId = getCurrentUserId();
@@ -43,20 +41,12 @@ public class TicketService {
 
         Ticket savedTicket = ticketRepository.save(ticket);
 
-        log.info("Ticket created successfully with ID: {}", savedTicket.getTicketId());
-
         return TicketMapper.toResponseDTO(savedTicket);
     }
 
     private EventDTO validateAndGetEvent(String eventName) {
         try {
-            log.info("Validating event: {}", eventName);
-
             EventPageResponseDTO eventPage = eventServiceClient.getEvents(0, false, "eventName", "ASC");
-
-            log.info("Event page response received: events={}, totalElements={}",
-                    eventPage.getEvents() != null ? eventPage.getEvents().size() : "null",
-                    eventPage.getTotalElements());
 
             if (eventPage.getEvents() == null || eventPage.getEvents().isEmpty()) {
                 throw new EventNotFoundException("No events found or event service returned empty response");
@@ -67,13 +57,9 @@ public class TicketService {
                     .findFirst()
                     .orElseThrow(
                             () -> new EventNotFoundException("Event '" + eventName + "' not found or is cancelled"));
-
-            log.info("Event found: {} - ID: {} - Cancelled: {}",
-                    event.getEventName(), event.getEventId(), event.isCanceled());
             return event;
 
         } catch (Exception ex) {
-            log.error("Error validating event '{}': {}", eventName, ex.getMessage());
             if (ex instanceof EventNotFoundException) {
                 throw ex;
             }
@@ -91,12 +77,32 @@ public class TicketService {
     }
 
     public boolean hasTicketsForEvent(String eventId) {
-        log.info("Checking if tickets exist for event: {}", eventId);
         return ticketRepository.existsByEventId(eventId);
     }
 
     public long getTicketCountForEvent(String eventId) {
-        log.info("Counting tickets for event: {}", eventId);
         return ticketRepository.countByEventId(eventId);
+    }
+
+    public TicketCheckResponseDTO checkActiveTicketsForEvent(String eventId) {
+        try {
+            long totalTickets = ticketRepository.countByEventId(eventId);
+            long activeTickets = totalTickets;
+            boolean hasTickets = totalTickets > 0;
+
+            String message = hasTickets
+                    ? String.format("Event has %d active tickets out of %d total", activeTickets, totalTickets)
+                    : "No tickets found for this event";
+
+            return new TicketCheckResponseDTO(eventId, hasTickets, message, activeTickets, totalTickets);
+
+        } catch (Exception e) {
+            return new TicketCheckResponseDTO(
+                    eventId,
+                    false,
+                    "Error checking tickets: " + e.getMessage(),
+                    0L,
+                    0L);
+        }
     }
 }
