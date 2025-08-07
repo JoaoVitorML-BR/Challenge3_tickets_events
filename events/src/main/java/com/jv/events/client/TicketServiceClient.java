@@ -9,12 +9,6 @@ import com.jv.events.dto.TicketCheckResponseDTO;
 @FeignClient(name = "ticket-service", url = "http://localhost:8081", fallback = TicketServiceFallback.class)
 public interface TicketServiceClient {
 
-    @GetMapping("/api/v1/tickets/event/{eventId}/exists")
-    Boolean hasTicketsForEvent(@PathVariable("eventId") String eventId);
-
-    @GetMapping("/api/v1/tickets/event/{eventId}/count")
-    Long getTicketCountForEvent(@PathVariable("eventId") String eventId);
-
-    @GetMapping("/api/v1/tickets/event/{eventId}/active-check")
-    TicketCheckResponseDTO checkActiveTicketsForEvent(@PathVariable("eventId") String eventId);
+    @GetMapping("/api/v1/tickets/event/{eventId}/check")
+    TicketCheckResponseDTO checkTicketsForEvent(@PathVariable("eventId") String eventId);
 }

@@ -11,17 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 public class TicketServiceFallback implements TicketServiceClient {
 
     @Override
-    public Boolean hasTicketsForEvent(String eventId) {
-        return false;
-    }
-
-    @Override
-    public Long getTicketCountForEvent(String eventId) {
-        return 0L;
-    }
-
-    @Override
-    public TicketCheckResponseDTO checkActiveTicketsForEvent(String eventId) {
+    public TicketCheckResponseDTO checkTicketsForEvent(String eventId) {
+        log.warn("Ticket service unavailable for event {}, using fallback", eventId);
         return new TicketCheckResponseDTO(
             eventId, 
             false, 

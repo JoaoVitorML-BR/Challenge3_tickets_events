@@ -1,5 +1,10 @@
 package com.jv.ticket.ticket.service;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -10,7 +15,11 @@ import com.jv.ticket.ticket.dto.EventDTO;
 import com.jv.ticket.ticket.dto.EventPageResponseDTO;
 import com.jv.ticket.ticket.dto.TicketCreateDTO;
 import com.jv.ticket.ticket.dto.TicketResponseDTO;
+import com.jv.ticket.ticket.dto.TicketCheckResponseDTO;
 import com.jv.ticket.ticket.exception.EventNotFoundException;
+import com.jv.ticket.ticket.exception.TicketNotFoundException;
+import com.jv.ticket.ticket.exception.TicketAlreadyCancelledException;
+import com.jv.ticket.ticket.exception.UnauthorizedTicketAccessException;
 import com.jv.ticket.ticket.mapper.TicketMapper;
 import com.jv.ticket.ticket.models.Ticket;
 import com.jv.ticket.ticket.repository.TicketRepository;
@@ -30,33 +39,19 @@ public class TicketService {
 
     @Transactional
     public TicketResponseDTO createTicket(TicketCreateDTO createDTO) {
-        log.info("Creating ticket for customer: {} and event: {}",
-                createDTO.getCustomerName(), createDTO.getEventName());
-
         CpfValidator.validateCpf(createDTO.getCpf());
 
         String userId = getCurrentUserId();
-
         EventDTO event = validateAndGetEvent(createDTO.getEventName());
-
         Ticket ticket = TicketMapper.toEntity(createDTO, userId, event);
-
         Ticket savedTicket = ticketRepository.save(ticket);
-
-        log.info("Ticket created successfully with ID: {}", savedTicket.getTicketId());
 
         return TicketMapper.toResponseDTO(savedTicket);
     }
 
     private EventDTO validateAndGetEvent(String eventName) {
         try {
-            log.info("Validating event: {}", eventName);
-
             EventPageResponseDTO eventPage = eventServiceClient.getEvents(0, false, "eventName", "ASC");
-
-            log.info("Event page response received: events={}, totalElements={}",
-                    eventPage.getEvents() != null ? eventPage.getEvents().size() : "null",
-                    eventPage.getTotalElements());
 
             if (eventPage.getEvents() == null || eventPage.getEvents().isEmpty()) {
                 throw new EventNotFoundException("No events found or event service returned empty response");
@@ -67,13 +62,9 @@ public class TicketService {
                     .findFirst()
                     .orElseThrow(
                             () -> new EventNotFoundException("Event '" + eventName + "' not found or is cancelled"));
-
-            log.info("Event found: {} - ID: {} - Cancelled: {}",
-                    event.getEventName(), event.getEventId(), event.isCanceled());
             return event;
 
         } catch (Exception ex) {
-            log.error("Error validating event '{}': {}", eventName, ex.getMessage());
             if (ex instanceof EventNotFoundException) {
                 throw ex;
             }
@@ -90,13 +81,69 @@ public class TicketService {
         throw new RuntimeException("User not authenticated");
     }
 
-    public boolean hasTicketsForEvent(String eventId) {
-        log.info("Checking if tickets exist for event: {}", eventId);
-        return ticketRepository.existsByEventId(eventId);
+    public TicketCheckResponseDTO checkActiveTicketsForEvent(String eventId) {
+        try {
+            long totalTickets = ticketRepository.countByEventId(eventId);
+            long activeTickets = ticketRepository.countByEventIdAndStatus(eventId, Ticket.TicketStatus.ACTIVE);
+            boolean hasTickets = activeTickets > 0;
+            
+            String message = totalTickets == 0 
+                ? "No tickets found for this event"
+                : String.format("Event has %d active tickets out of %d total", activeTickets, totalTickets);
+            
+            return new TicketCheckResponseDTO(eventId, hasTickets, message, activeTickets, totalTickets);
+            
+        } catch (Exception e) {
+            return new TicketCheckResponseDTO(
+                eventId, 
+                false, 
+                "Error checking tickets: " + e.getMessage(), 
+                0L, 
+                0L
+            );
+        }
     }
 
-    public long getTicketCountForEvent(String eventId) {
-        log.info("Counting tickets for event: {}", eventId);
-        return ticketRepository.countByEventId(eventId);
+    public Optional<TicketResponseDTO> getTicketById(String ticketId) {
+        return ticketRepository.findById(ticketId)
+                .map(TicketMapper::toResponseDTO);
+    }
+
+    public Page<TicketResponseDTO> getTicketsByUser(String userId, Pageable pageable) {
+        return ticketRepository.findByUserId(userId, pageable)
+                .map(TicketMapper::toResponseDTO);
+    }
+
+    public Page<TicketResponseDTO> getMyTickets(Pageable pageable) {
+        String userId = getCurrentUserId();
+        return getTicketsByUser(userId, pageable);
+    }
+
+    public List<TicketResponseDTO> getTicketsByStatus(Ticket.TicketStatus status) {
+        return ticketRepository.findByStatus(status).stream()
+                .map(TicketMapper::toResponseDTO)
+                .toList();
+    }
+
+    @Transactional
+    public TicketResponseDTO cancelTicket(String ticketId) {        
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new TicketNotFoundException("Ticket not found: " + ticketId));
+        
+        String currentUserId = getCurrentUserId();
+        if (!ticket.getUserId().equals(currentUserId)) {
+            throw new UnauthorizedTicketAccessException("You don't have permission to cancel this ticket");
+        }
+        
+        if (ticket.getStatus() == Ticket.TicketStatus.CANCELLED) {
+            throw new TicketAlreadyCancelledException("Ticket is already cancelled");
+        }
+        
+        ticket.setStatus(Ticket.TicketStatus.CANCELLED);
+        ticket.setUpdatedAt(java.time.LocalDateTime.now());
+        
+        Ticket savedTicket = ticketRepository.save(ticket);
+        
+        return TicketMapper.toResponseDTO(savedTicket);
     }
 }
