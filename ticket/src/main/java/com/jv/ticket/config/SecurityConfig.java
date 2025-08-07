@@ -39,10 +39,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/events").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/exists").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/count").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/active-check").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/check").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(
