@@ -101,7 +101,6 @@ public class EventIT {
     @Test
     @DisplayName("Should return 400 when CEP is invalid")
     void createEvent_InvalidCep_ShouldReturn400() throws Exception {
-        // Given
         EventCreateDTO createDTO = new EventCreateDTO();
         createDTO.setEventName("Tech Conference 2025");
         createDTO.setEventDate("25/12/2025");
@@ -178,6 +177,113 @@ public class EventIT {
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should get all events without pagination")
+    void getAllEvents_WithoutPagination_ShouldReturnEventsList() throws Exception {
+        Event event1 = new Event();
+        event1.setEventName("Event One");
+        event1.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event1.setCep("01001000");
+        event1.setLogradouro("Praça da Sé");
+        event1.setBairro("Sé");
+        event1.setCidade("São Paulo");
+        event1.setUf("SP");
+        event1.setCanceled(false);
+        eventRepository.save(event1);
+
+        Event event2 = new Event();
+        event2.setEventName("Event Two");
+        event2.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        event2.setCep("01001000");
+        event2.setLogradouro("Praça da Sé");
+        event2.setBairro("Sé");
+        event2.setCidade("São Paulo");
+        event2.setUf("SP");
+        event2.setCanceled(true);
+        eventRepository.save(event2);
+
+        ResponseEntity<String> response = restTemplate.getForEntity(baseUrl, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event One"));
+            assertTrue(responseBody.contains("Event Two"));
+            assertTrue(responseBody.contains("São Paulo"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should get events with pagination")
+    void getAllEvents_WithPagination_ShouldReturnPagedResponse() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            Event event = new Event();
+            event.setEventName("Event " + i);
+            event.setEventDate(java.time.LocalDate.of(2025, 12, i + 20));
+            event.setCep("01001000");
+            event.setLogradouro("Praça da Sé");
+            event.setBairro("Sé");
+            event.setCidade("São Paulo");
+            event.setUf("SP");
+            event.setCanceled(false);
+            eventRepository.save(event);
+        }
+
+        String url = baseUrl + "?page=0&size=3";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("totalPages"));
+            assertTrue(responseBody.contains("totalElements"));
+            assertTrue(responseBody.contains("hasNext"));
+            assertTrue(responseBody.contains("hasPrevious"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should filter events by canceled status")
+    void getAllEvents_FilterByCanceled_ShouldReturnFilteredEvents() throws Exception {
+        Event activeEvent = new Event();
+        activeEvent.setEventName("Active Event");
+        activeEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        activeEvent.setCep("01001000");
+        activeEvent.setLogradouro("Praça da Sé");
+        activeEvent.setBairro("Sé");
+        activeEvent.setCidade("São Paulo");
+        activeEvent.setUf("SP");
+        activeEvent.setCanceled(false);
+        eventRepository.save(activeEvent);
+
+        Event canceledEvent = new Event();
+        canceledEvent.setEventName("Canceled Event");
+        canceledEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        canceledEvent.setCep("01001000");
+        canceledEvent.setLogradouro("Praça da Sé");
+        canceledEvent.setBairro("Sé");
+        canceledEvent.setCidade("São Paulo");
+        canceledEvent.setUf("SP");
+        canceledEvent.setCanceled(true);
+        eventRepository.save(canceledEvent);
+
+        String url = baseUrl + "?canceled=false";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Active Event"));
+            assertFalse(responseBody.contains("Canceled Event"));
         }
     }
 }
