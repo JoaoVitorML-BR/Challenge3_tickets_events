@@ -191,6 +191,108 @@ public class EventIT {
     }
 
     @Test
+    @DisplayName("Should return 503 when ViaCEP API is unavailable")
+    void createEvent_ViaCepApiUnavailable_ShouldReturn503() throws Exception {
+        EventCreateDTO eventCreateDTO = new EventCreateDTO();
+        eventCreateDTO.setEventName("Event with API Error");
+        eventCreateDTO.setEventDate("25/12/2025");
+        eventCreateDTO.setCep("01001000");
+
+        when(viaCepClient.buscarCep(anyString())).thenThrow(new RuntimeException("ViaCEP connection timeout"));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(eventCreateDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Serviço Indisponível") || 
+                      responseBody.contains("Erro ao consultar CEP"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when trying to cancel event with tickets")
+    void cancelEvent_WithTickets_ShouldReturn409() throws Exception {
+        Event eventWithTickets = new Event();
+        eventWithTickets.setEventName("Event with Tickets");
+        eventWithTickets.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        eventWithTickets.setCep("01001000");
+        eventWithTickets.setLogradouro("Praça da Sé");
+        eventWithTickets.setBairro("Sé");
+        eventWithTickets.setCidade("São Paulo");
+        eventWithTickets.setUf("SP");
+        eventWithTickets.setCanceled(false);
+        Event savedEvent = eventRepository.save(eventWithTickets);
+
+        TicketCheckResponseDTO ticketResponse = new TicketCheckResponseDTO();
+        ticketResponse.setEventId(savedEvent.getId());
+        ticketResponse.setHasTickets(true);
+        ticketResponse.setActiveTicketCount(5L);
+        ticketResponse.setTotalTicketCount(5L);
+        ticketResponse.setMessage("Event has active tickets");
+        
+        when(ticketServiceClient.checkTicketsForEvent(savedEvent.getId())).thenReturn(ticketResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Cancelamento Não Permitido") ||
+                      responseBody.contains("Cannot cancel event") ||
+                      responseBody.contains("ticket"));
+        }
+
+        Event unchangedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(unchangedEvent);
+        assertFalse(unchangedEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when event not found for reactivation")
+    void reactivateEvent_EventNotFound_ShouldReturn404() throws Exception {
+        Event event = new Event();
+        event.setEventName("Test Event for Database Error");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(true);
+        Event savedEvent = eventRepository.save(event);
+        
+        eventRepository.deleteById(savedEvent.getId());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+    }
+
+    // ========================== GET ALL EVENTS TESTS ==========================
+
+    @Test
     @DisplayName("Should get all events without pagination")
     void getAllEvents_WithoutPagination_ShouldReturnEventsList() throws Exception {
         Event event1 = new Event();
