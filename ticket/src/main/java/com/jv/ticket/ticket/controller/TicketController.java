@@ -80,6 +80,7 @@ public class TicketController {
     }
 
     @GetMapping("/cpf/{cpf}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TicketResponseDTO>> getTicketByCpf(@PathVariable String cpf) {
         List<TicketResponseDTO> tickets = ticketService.getTicketsByCpf(cpf);
         return ResponseEntity.ok(tickets);
