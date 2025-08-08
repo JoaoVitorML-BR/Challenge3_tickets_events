@@ -691,4 +691,69 @@ class TicketIT {
             .jsonPath("$.activeTicketCount").isEqualTo(2)
             .jsonPath("$.totalTicketCount").isEqualTo(2);
     }
+
+    @Test
+    public void getTicketById_WithValidId_ShouldReturn200() {
+        String token = createUserAndGetToken();
+        
+        TicketCreateDTO ticketCreateDTO = new TicketCreateDTO();
+        ticketCreateDTO.setCustomerName("João Silva");
+        ticketCreateDTO.setCpf("87747294034");
+        ticketCreateDTO.setCustomerEmail("joao@email.com");
+        ticketCreateDTO.setEventName("Teste Evento");
+        ticketCreateDTO.setBrlAmount(new BigDecimal("50.00"));
+        
+        byte[] ticketResponse = webTestClient
+            .post()
+            .uri("/api/v1/tickets")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(ticketCreateDTO)
+            .exchange()
+            .expectStatus().isCreated()
+            .expectBody()
+            .jsonPath("$.ticketId").exists()
+            .returnResult()
+            .getResponseBody();
+        
+        String responseStr = new String(ticketResponse);
+        String extractedId = responseStr.split("\"ticketId\":\"")[1].split("\"")[0];
+        
+        webTestClient
+            .get()
+            .uri("/api/v1/tickets/" + extractedId)
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.ticketId").isEqualTo(extractedId)
+            .jsonPath("$.event.eventName").isEqualTo("Teste Evento")
+            .jsonPath("$.brlTotalAmount").isEqualTo(50.00)
+            .jsonPath("$.cpf").isEqualTo("87747294034")
+            .jsonPath("$.status").isEqualTo("ativo");
+    }
+
+    @Test
+    public void getTicketById_WithInvalidId_ShouldReturn404() {
+        String token = createUserAndGetToken();
+        String invalidTicketId = "507f1f77bcf86cd799439011";
+        
+        webTestClient
+            .get()
+            .uri("/api/v1/tickets/" + invalidTicketId)
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isNotFound();
+    }
+
+    @Test
+    public void getTicketById_WithoutAuthentication_ShouldReturn401() {
+        String ticketId = "507f1f77bcf86cd799439011";
+        
+        webTestClient
+            .get()
+            .uri("/api/v1/tickets/" + ticketId)
+            .exchange()
+            .expectStatus().isUnauthorized();
+    }
 }
