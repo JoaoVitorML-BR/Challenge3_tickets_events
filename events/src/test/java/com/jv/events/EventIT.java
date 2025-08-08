@@ -1,7 +1,9 @@
 package com.jv.events;
 
+import com.jv.events.client.TicketServiceClient;
 import com.jv.events.client.ViaCepClient;
 import com.jv.events.dto.EventCreateDTO;
+import com.jv.events.dto.TicketCheckResponseDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.models.Event;
 import com.jv.events.repository.EventRepository;
@@ -40,7 +42,12 @@ public class EventIT {
     private EventRepository eventRepository;
 
     @MockBean
+    @SuppressWarnings("deprecation")
     private ViaCepClient viaCepClient;
+
+    @MockBean
+    @SuppressWarnings("deprecation")
+    private TicketServiceClient ticketServiceClient;
 
     private ViaCepResponse validViaCepResponse;
     private String baseUrl;
@@ -49,7 +56,7 @@ public class EventIT {
     void setUp() {
         baseUrl = "http://localhost:" + port + "/api/v1/events";
         eventRepository.deleteAll();
-        
+
         validViaCepResponse = new ViaCepResponse();
         validViaCepResponse.setCep("01001000");
         validViaCepResponse.setLogradouro("Praça da Sé");
@@ -57,6 +64,10 @@ public class EventIT {
         validViaCepResponse.setLocalidade("São Paulo");
         validViaCepResponse.setUf("SP");
         validViaCepResponse.setErro(false);
+
+        // Setup default mock responses for TicketServiceClient
+        when(ticketServiceClient.checkTicketsForEvent(anyString()))
+                .thenReturn(new TicketCheckResponseDTO("eventId", false, "No tickets found", 0L, 0L));
     }
 
     // ========================== SUCCESS CASES ==========================
@@ -79,7 +90,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Tech Conference 2025"));
@@ -117,7 +128,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("CEP Inválido"));
@@ -154,7 +165,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Nome de Evento Duplicado"));
@@ -172,7 +183,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Evento Não Encontrado"));
@@ -208,7 +219,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Event One"));
@@ -238,7 +249,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("totalPages"));
@@ -278,7 +289,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Active Event"));
@@ -307,7 +318,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Tech Meetup 2025"));
@@ -328,7 +339,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Evento Não Encontrado"));
@@ -355,7 +366,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Canceled Conference"));
@@ -376,7 +387,8 @@ public class EventIT {
         assertNotNull(response.getBody());
     }
 
-    // ========================== SEARCH EVENTS BY NAME TESTS ==========================
+    // ========================== SEARCH EVENTS BY NAME TESTS
+    // ==========================
 
     @Test
     @DisplayName("Should search events by name without pagination")
@@ -408,7 +420,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Tech Conference 2025"));
@@ -437,7 +449,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Conference"));
@@ -467,7 +479,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("[]") || responseBody.contains("\"events\":[]"));
@@ -493,7 +505,7 @@ public class EventIT {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("TECH Conference 2025"));
@@ -529,11 +541,12 @@ public class EventIT {
         HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
 
         String url = baseUrl + "/" + savedEvent.getId();
-        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Updated Event Name"));
@@ -560,11 +573,12 @@ public class EventIT {
         HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
 
         String url = baseUrl + "/" + nonExistentId;
-        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Evento Não Encontrado"));
@@ -600,11 +614,12 @@ public class EventIT {
         HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
 
         String url = baseUrl + "/" + savedEvent.getId();
-        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("CEP Inválido"));
@@ -649,14 +664,253 @@ public class EventIT {
         HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
 
         String url = baseUrl + "/" + savedSecondEvent.getId();
-        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         String responseBody = response.getBody();
         if (responseBody != null) {
             assertTrue(responseBody.contains("Nome de Evento Duplicado"));
         }
+    }
+
+    // ========================== CANCEL EVENT TESTS ==========================
+
+    @Test
+    @DisplayName("Should successfully cancel an active event")
+    void cancelEvent_ActiveEvent_ShouldReturnCanceledEvent() throws Exception {
+        Event activeEvent = new Event();
+        activeEvent.setEventName("Tech Conference 2025");
+        activeEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        activeEvent.setCep("01001000");
+        activeEvent.setLogradouro("Praça da Sé");
+        activeEvent.setBairro("Sé");
+        activeEvent.setCidade("São Paulo");
+        activeEvent.setUf("SP");
+        activeEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(activeEvent);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("\"canceled\":true"));
+            assertTrue(responseBody.contains("Tech Conference 2025"));
+        }
+
+        Event canceledEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(canceledEvent);
+        assertTrue(canceledEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when canceling non-existent event")
+    void cancelEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + nonExistentId + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when trying to cancel already canceled event")
+    void cancelEvent_AlreadyCanceled_ShouldReturn409() throws Exception {
+        Event eventToCancel = new Event();
+        eventToCancel.setEventName("Conference to Cancel");
+        eventToCancel.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        eventToCancel.setCep("01001000");
+        eventToCancel.setLogradouro("Praça da Sé");
+        eventToCancel.setBairro("Sé");
+        eventToCancel.setCidade("São Paulo");
+        eventToCancel.setUf("SP");
+        eventToCancel.setCanceled(false);
+        Event savedEvent = eventRepository.save(eventToCancel);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request, String.class);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Já Cancelado") ||
+                    responseBody.contains("already cancelled") ||
+                    responseBody.contains("já cancelado"));
+        }
+    }
+
+    // ======= REACTIVATE EVENT TESTS =======
+
+    @Test
+    @DisplayName("Should reactivate canceled event successfully")
+    void reactivateEvent_CanceledEvent_ShouldReturn200() throws Exception {
+        Event event = new Event();
+        event.setEventName("Event to Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(true);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event to Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event reactivatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(reactivatedEvent);
+        assertFalse(reactivatedEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when reactivating non-existent event")
+    void reactivateEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + nonExistentId + "/reactivate";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado") ||
+                    responseBody.contains("not found") ||
+                    responseBody.contains("não encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should reactivate already active event")
+    void reactivateEvent_ActiveEvent_ShouldReturn200() throws Exception {
+        Event event = new Event();
+        event.setEventName("Active Event to Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Active Event to Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event stillActiveEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(stillActiveEvent);
+        assertFalse(stillActiveEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should cancel and reactivate event successfully")
+    void cancelAndReactivateEvent_ShouldWork() throws Exception {
+        Event event = new Event();
+        event.setEventName("Event for Cancel and Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String cancelUrl = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> cancelResponse = restTemplate.exchange(cancelUrl,
+                org.springframework.http.HttpMethod.PATCH, request, String.class);
+        assertEquals(HttpStatus.OK, cancelResponse.getStatusCode());
+
+        Event canceledEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(canceledEvent);
+        assertTrue(canceledEvent.isCanceled());
+
+        String reactivateUrl = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+        ResponseEntity<String> reactivateResponse = restTemplate.exchange(reactivateUrl,
+                org.springframework.http.HttpMethod.PATCH, request, String.class);
+
+        assertEquals(HttpStatus.OK, reactivateResponse.getStatusCode());
+        assertNotNull(reactivateResponse.getBody());
+
+        String responseBody = reactivateResponse.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event for Cancel and Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event reactivatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(reactivatedEvent);
+        assertFalse(reactivatedEvent.isCanceled());
     }
 }
