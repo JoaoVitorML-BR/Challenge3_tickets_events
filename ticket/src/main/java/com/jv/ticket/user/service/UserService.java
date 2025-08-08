@@ -41,11 +41,9 @@ public class UserService {
             throw new CpfViolationException("CPF cannot be empty or blank.");
         }
         
-        // Validar formato do CPF usando CpfValidator
         CpfValidator.validateCpf(user.getCpf());
         user.setCpf(CpfValidator.formatCpf(user.getCpf()));
         
-        // Verificar se CPF já existe
         if (userRepository.findByCpf(user.getCpf()).isPresent()) {
             throw new CpfViolationException(String.format("CPF '%s' is already in use", user.getCpf()));
         }
