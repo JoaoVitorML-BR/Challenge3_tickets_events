@@ -499,4 +499,164 @@ public class EventIT {
             assertTrue(responseBody.contains("TECH Conference 2025"));
         }
     }
+
+    // ========================== UPDATE EVENT TESTS ==========================
+
+    @Test
+    @DisplayName("Should update event successfully with valid data")
+    void updateEvent_ValidData_ShouldReturnUpdatedEvent() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Original Event");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        existingEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(existingEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Updated Event Name"));
+            assertTrue(responseBody.contains("26/12/2025"));
+        }
+
+        Event updatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(updatedEvent);
+        assertEquals("Updated Event Name", updatedEvent.getEventName());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when updating non-existent event")
+    void updateEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + nonExistentId;
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 400 when updating event with invalid CEP")
+    void updateEvent_InvalidCep_ShouldReturn400() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Original Event");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        existingEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(existingEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"00000000\""
+                + "}";
+
+        ViaCepResponse invalidCepResponse = new ViaCepResponse();
+        invalidCepResponse.setErro(true);
+        when(viaCepClient.buscarCep(anyString())).thenReturn(invalidCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("CEP Inválido"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when updating event with duplicate name")
+    void updateEvent_DuplicateName_ShouldReturn409() throws Exception {
+        Event firstEvent = new Event();
+        firstEvent.setEventName("Existing Event");
+        firstEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        firstEvent.setCep("01001000");
+        firstEvent.setLogradouro("Praça da Sé");
+        firstEvent.setBairro("Sé");
+        firstEvent.setCidade("São Paulo");
+        firstEvent.setUf("SP");
+        firstEvent.setCanceled(false);
+        eventRepository.save(firstEvent);
+
+        Event secondEvent = new Event();
+        secondEvent.setEventName("Another Event");
+        secondEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        secondEvent.setCep("01001000");
+        secondEvent.setLogradouro("Praça da Sé");
+        secondEvent.setBairro("Sé");
+        secondEvent.setCidade("São Paulo");
+        secondEvent.setUf("SP");
+        secondEvent.setCanceled(false);
+        Event savedSecondEvent = eventRepository.save(secondEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Existing Event\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedSecondEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request, String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Nome de Evento Duplicado"));
+        }
+    }
 }
