@@ -10,6 +10,7 @@ import com.jv.events.dto.EventUpdateDTO;
 import com.jv.events.dto.PagedEventResponseDTO;
 import com.jv.events.dto.ViaCepResponse;
 import com.jv.events.exception.CepInvalidoException;
+import com.jv.events.exception.EventAlreadyCancelledException;
 import com.jv.events.exception.EventCancellationNotAllowedException;
 import com.jv.events.exception.EventCreationException;
 import com.jv.events.exception.EventNameAlreadyExistsException;
@@ -190,7 +191,7 @@ public class EventController {
 
             EventResponseDTO response = EventMapper.toResponseDTO(canceledEvent);
             return ResponseEntity.ok(response);
-        } catch (EventNotFoundException | EventCancellationNotAllowedException e) {
+        } catch (EventNotFoundException | EventCancellationNotAllowedException | EventAlreadyCancelledException e) {
             throw e;
         } catch (Exception e) {
             throw new EventCreationException("Error canceling event", e);

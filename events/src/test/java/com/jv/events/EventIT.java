@@ -1,0 +1,1018 @@
+package com.jv.events;
+
+import com.jv.events.client.TicketServiceClient;
+import com.jv.events.client.ViaCepClient;
+import com.jv.events.dto.EventCreateDTO;
+import com.jv.events.dto.TicketCheckResponseDTO;
+import com.jv.events.dto.ViaCepResponse;
+import com.jv.events.models.Event;
+import com.jv.events.repository.EventRepository;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+@DisplayName("Event Integration Tests")
+public class EventIT {
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired
+    private EventRepository eventRepository;
+
+    @MockBean
+    @SuppressWarnings("deprecation")
+    private ViaCepClient viaCepClient;
+
+    @MockBean
+    @SuppressWarnings("deprecation")
+    private TicketServiceClient ticketServiceClient;
+
+    private ViaCepResponse validViaCepResponse;
+    private String baseUrl;
+
+    @BeforeEach
+    void setUp() {
+        baseUrl = "http://localhost:" + port + "/api/v1/events";
+        eventRepository.deleteAll();
+
+        validViaCepResponse = new ViaCepResponse();
+        validViaCepResponse.setCep("01001000");
+        validViaCepResponse.setLogradouro("Praça da Sé");
+        validViaCepResponse.setBairro("Sé");
+        validViaCepResponse.setLocalidade("São Paulo");
+        validViaCepResponse.setUf("SP");
+        validViaCepResponse.setErro(false);
+
+        // Setup default mock responses for TicketServiceClient
+        when(ticketServiceClient.checkTicketsForEvent(anyString()))
+                .thenReturn(new TicketCheckResponseDTO("eventId", false, "No tickets found", 0L, 0L));
+    }
+
+    // ========================== SUCCESS CASES ==========================
+
+    @Test
+    @DisplayName("Should create event successfully with valid data")
+    void createEvent_ValidData_ShouldReturnCreated() throws Exception {
+        EventCreateDTO createDTO = new EventCreateDTO();
+        createDTO.setEventName("Tech Conference 2025");
+        createDTO.setEventDate("25/12/2025");
+        createDTO.setCep("01001000");
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(createDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Tech Conference 2025"));
+            assertTrue(responseBody.contains("01001000"));
+            assertTrue(responseBody.contains("Praça da Sé"));
+            assertTrue(responseBody.contains("São Paulo"));
+        }
+
+        assertEquals(1, eventRepository.count());
+        Event savedEvent = eventRepository.findAll().get(0);
+        assertEquals("Tech Conference 2025", savedEvent.getEventName());
+        assertEquals("01001000", savedEvent.getCep());
+        assertFalse(savedEvent.isCanceled());
+    }
+
+    // ========================== EXCEPTION TESTS ==========================
+
+    @Test
+    @DisplayName("Should return 400 when CEP is invalid")
+    void createEvent_InvalidCep_ShouldReturn400() throws Exception {
+        EventCreateDTO createDTO = new EventCreateDTO();
+        createDTO.setEventName("Tech Conference 2025");
+        createDTO.setEventDate("25/12/2025");
+        createDTO.setCep("00000000");
+
+        ViaCepResponse invalidCepResponse = new ViaCepResponse();
+        invalidCepResponse.setErro(true);
+        when(viaCepClient.buscarCep(anyString())).thenReturn(invalidCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(createDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("CEP Inválido"));
+        }
+
+        assertEquals(0, eventRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 409 when event name already exists")
+    void createEvent_DuplicateName_ShouldReturn409() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Tech Conference 2025");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        eventRepository.save(existingEvent);
+
+        EventCreateDTO createDTO = new EventCreateDTO();
+        createDTO.setEventName("Tech Conference 2025");
+        createDTO.setEventDate("25/12/2025");
+        createDTO.setCep("01001000");
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(createDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Nome de Evento Duplicado"));
+        }
+
+        assertEquals(1, eventRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when event not found")
+    void getEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        ResponseEntity<String> response = restTemplate.getForEntity(baseUrl + "/" + nonExistentId, String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 503 when ViaCEP API is unavailable")
+    void createEvent_ViaCepApiUnavailable_ShouldReturn503() throws Exception {
+        EventCreateDTO eventCreateDTO = new EventCreateDTO();
+        eventCreateDTO.setEventName("Event with API Error");
+        eventCreateDTO.setEventDate("25/12/2025");
+        eventCreateDTO.setCep("01001000");
+
+        when(viaCepClient.buscarCep(anyString())).thenThrow(new RuntimeException("ViaCEP connection timeout"));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(eventCreateDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Serviço Indisponível") || 
+                      responseBody.contains("Erro ao consultar CEP"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when trying to cancel event with tickets")
+    void cancelEvent_WithTickets_ShouldReturn409() throws Exception {
+        Event eventWithTickets = new Event();
+        eventWithTickets.setEventName("Event with Tickets");
+        eventWithTickets.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        eventWithTickets.setCep("01001000");
+        eventWithTickets.setLogradouro("Praça da Sé");
+        eventWithTickets.setBairro("Sé");
+        eventWithTickets.setCidade("São Paulo");
+        eventWithTickets.setUf("SP");
+        eventWithTickets.setCanceled(false);
+        Event savedEvent = eventRepository.save(eventWithTickets);
+
+        TicketCheckResponseDTO ticketResponse = new TicketCheckResponseDTO();
+        ticketResponse.setEventId(savedEvent.getId());
+        ticketResponse.setHasTickets(true);
+        ticketResponse.setActiveTicketCount(5L);
+        ticketResponse.setTotalTicketCount(5L);
+        ticketResponse.setMessage("Event has active tickets");
+        
+        when(ticketServiceClient.checkTicketsForEvent(savedEvent.getId())).thenReturn(ticketResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Cancelamento Não Permitido") ||
+                      responseBody.contains("Cannot cancel event") ||
+                      responseBody.contains("ticket"));
+        }
+
+        Event unchangedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(unchangedEvent);
+        assertFalse(unchangedEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when event not found for reactivation")
+    void reactivateEvent_EventNotFound_ShouldReturn404() throws Exception {
+        Event event = new Event();
+        event.setEventName("Test Event for Database Error");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(true);
+        Event savedEvent = eventRepository.save(event);
+        
+        eventRepository.deleteById(savedEvent.getId());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+    }
+
+    // ========================== GET ALL EVENTS TESTS ==========================
+
+    @Test
+    @DisplayName("Should get all events without pagination")
+    void getAllEvents_WithoutPagination_ShouldReturnEventsList() throws Exception {
+        Event event1 = new Event();
+        event1.setEventName("Event One");
+        event1.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event1.setCep("01001000");
+        event1.setLogradouro("Praça da Sé");
+        event1.setBairro("Sé");
+        event1.setCidade("São Paulo");
+        event1.setUf("SP");
+        event1.setCanceled(false);
+        eventRepository.save(event1);
+
+        Event event2 = new Event();
+        event2.setEventName("Event Two");
+        event2.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        event2.setCep("01001000");
+        event2.setLogradouro("Praça da Sé");
+        event2.setBairro("Sé");
+        event2.setCidade("São Paulo");
+        event2.setUf("SP");
+        event2.setCanceled(true);
+        eventRepository.save(event2);
+
+        ResponseEntity<String> response = restTemplate.getForEntity(baseUrl, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event One"));
+            assertTrue(responseBody.contains("Event Two"));
+            assertTrue(responseBody.contains("São Paulo"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should get events with pagination")
+    void getAllEvents_WithPagination_ShouldReturnPagedResponse() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            Event event = new Event();
+            event.setEventName("Event " + i);
+            event.setEventDate(java.time.LocalDate.of(2025, 12, i + 20));
+            event.setCep("01001000");
+            event.setLogradouro("Praça da Sé");
+            event.setBairro("Sé");
+            event.setCidade("São Paulo");
+            event.setUf("SP");
+            event.setCanceled(false);
+            eventRepository.save(event);
+        }
+
+        String url = baseUrl + "?page=0&size=3";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("totalPages"));
+            assertTrue(responseBody.contains("totalElements"));
+            assertTrue(responseBody.contains("hasNext"));
+            assertTrue(responseBody.contains("hasPrevious"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should filter events by canceled status")
+    void getAllEvents_FilterByCanceled_ShouldReturnFilteredEvents() throws Exception {
+        Event activeEvent = new Event();
+        activeEvent.setEventName("Active Event");
+        activeEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        activeEvent.setCep("01001000");
+        activeEvent.setLogradouro("Praça da Sé");
+        activeEvent.setBairro("Sé");
+        activeEvent.setCidade("São Paulo");
+        activeEvent.setUf("SP");
+        activeEvent.setCanceled(false);
+        eventRepository.save(activeEvent);
+
+        Event canceledEvent = new Event();
+        canceledEvent.setEventName("Canceled Event");
+        canceledEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        canceledEvent.setCep("01001000");
+        canceledEvent.setLogradouro("Praça da Sé");
+        canceledEvent.setBairro("Sé");
+        canceledEvent.setCidade("São Paulo");
+        canceledEvent.setUf("SP");
+        canceledEvent.setCanceled(true);
+        eventRepository.save(canceledEvent);
+
+        String url = baseUrl + "?canceled=false";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Active Event"));
+            assertFalse(responseBody.contains("Canceled Event"));
+        }
+    }
+
+    // ========================== GET EVENT BY ID TESTS ==========================
+
+    @Test
+    @DisplayName("Should get event by ID successfully")
+    void getEventById_ValidId_ShouldReturnEvent() throws Exception {
+        Event savedEvent = new Event();
+        savedEvent.setEventName("Tech Meetup 2025");
+        savedEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        savedEvent.setCep("01001000");
+        savedEvent.setLogradouro("Praça da Sé");
+        savedEvent.setBairro("Sé");
+        savedEvent.setCidade("São Paulo");
+        savedEvent.setUf("SP");
+        savedEvent.setCanceled(false);
+        Event event = eventRepository.save(savedEvent);
+
+        String url = baseUrl + "/" + event.getId();
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Tech Meetup 2025"));
+            assertTrue(responseBody.contains("01001000"));
+            assertTrue(responseBody.contains("Praça da Sé"));
+            assertTrue(responseBody.contains("São Paulo"));
+            assertTrue(responseBody.contains(event.getId()));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 404 when getting event with non-existent ID")
+    void getEventById_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        String url = baseUrl + "/" + nonExistentId;
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+            assertTrue(responseBody.contains(nonExistentId));
+        }
+    }
+
+    @Test
+    @DisplayName("Should get canceled event by ID successfully")
+    void getEventById_CanceledEvent_ShouldReturnEvent() throws Exception {
+        Event savedEvent = new Event();
+        savedEvent.setEventName("Canceled Conference");
+        savedEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        savedEvent.setCep("01001000");
+        savedEvent.setLogradouro("Praça da Sé");
+        savedEvent.setBairro("Sé");
+        savedEvent.setCidade("São Paulo");
+        savedEvent.setUf("SP");
+        savedEvent.setCanceled(true);
+        Event event = eventRepository.save(savedEvent);
+
+        String url = baseUrl + "/" + event.getId();
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Canceled Conference"));
+            assertTrue(responseBody.contains("true"));
+            assertTrue(responseBody.contains(event.getId()));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 400 when getting event with invalid ID format")
+    void getEventById_InvalidIdFormat_ShouldReturn400OrError() throws Exception {
+        String invalidId = "invalid-id-format";
+
+        String url = baseUrl + "/" + invalidId;
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertTrue(response.getStatusCode().is4xxClientError() || response.getStatusCode().is5xxServerError());
+        assertNotNull(response.getBody());
+    }
+
+    // ========================== SEARCH EVENTS BY NAME TESTS
+    // ==========================
+
+    @Test
+    @DisplayName("Should search events by name without pagination")
+    void searchEventsByName_WithoutPagination_ShouldReturnMatchingEvents() throws Exception {
+        Event techEvent = new Event();
+        techEvent.setEventName("Tech Conference 2025");
+        techEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        techEvent.setCep("01001000");
+        techEvent.setLogradouro("Praça da Sé");
+        techEvent.setBairro("Sé");
+        techEvent.setCidade("São Paulo");
+        techEvent.setUf("SP");
+        techEvent.setCanceled(false);
+        eventRepository.save(techEvent);
+
+        Event musicEvent = new Event();
+        musicEvent.setEventName("Music Festival 2025");
+        musicEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        musicEvent.setCep("01001000");
+        musicEvent.setLogradouro("Praça da Sé");
+        musicEvent.setBairro("Sé");
+        musicEvent.setCidade("São Paulo");
+        musicEvent.setUf("SP");
+        musicEvent.setCanceled(false);
+        eventRepository.save(musicEvent);
+
+        String url = baseUrl + "/search?name=Tech";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Tech Conference 2025"));
+            assertFalse(responseBody.contains("Music Festival 2025"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should search events by name with pagination")
+    void searchEventsByName_WithPagination_ShouldReturnPagedResults() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            Event event = new Event();
+            event.setEventName("Conference " + i);
+            event.setEventDate(java.time.LocalDate.of(2025, 12, i + 20));
+            event.setCep("01001000");
+            event.setLogradouro("Praça da Sé");
+            event.setBairro("Sé");
+            event.setCidade("São Paulo");
+            event.setUf("SP");
+            event.setCanceled(false);
+            eventRepository.save(event);
+        }
+
+        String url = baseUrl + "/search?name=Conference&page=0&size=3";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Conference"));
+            assertTrue(responseBody.contains("totalPages"));
+            assertTrue(responseBody.contains("totalElements"));
+            assertTrue(responseBody.contains("hasNext"));
+            assertTrue(responseBody.contains("hasPrevious"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no events match search term")
+    void searchEventsByName_NoMatches_ShouldReturnEmptyList() throws Exception {
+        Event event = new Event();
+        event.setEventName("Tech Conference 2025");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        eventRepository.save(event);
+
+        String url = baseUrl + "/search?name=NonExistentEvent";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("[]") || responseBody.contains("\"events\":[]"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should search events case-insensitively")
+    void searchEventsByName_CaseInsensitive_ShouldReturnMatchingEvents() throws Exception {
+        Event event = new Event();
+        event.setEventName("TECH Conference 2025");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        eventRepository.save(event);
+
+        String url = baseUrl + "/search?name=tech";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("TECH Conference 2025"));
+        }
+    }
+
+    // ========================== UPDATE EVENT TESTS ==========================
+
+    @Test
+    @DisplayName("Should update event successfully with valid data")
+    void updateEvent_ValidData_ShouldReturnUpdatedEvent() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Original Event");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        existingEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(existingEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Updated Event Name"));
+            assertTrue(responseBody.contains("26/12/2025"));
+        }
+
+        Event updatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(updatedEvent);
+        assertEquals("Updated Event Name", updatedEvent.getEventName());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when updating non-existent event")
+    void updateEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + nonExistentId;
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 400 when updating event with invalid CEP")
+    void updateEvent_InvalidCep_ShouldReturn400() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Original Event");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        existingEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(existingEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Updated Event Name\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"00000000\""
+                + "}";
+
+        ViaCepResponse invalidCepResponse = new ViaCepResponse();
+        invalidCepResponse.setErro(true);
+        when(viaCepClient.buscarCep(anyString())).thenReturn(invalidCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("CEP Inválido"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when updating event with duplicate name")
+    void updateEvent_DuplicateName_ShouldReturn409() throws Exception {
+        Event firstEvent = new Event();
+        firstEvent.setEventName("Existing Event");
+        firstEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        firstEvent.setCep("01001000");
+        firstEvent.setLogradouro("Praça da Sé");
+        firstEvent.setBairro("Sé");
+        firstEvent.setCidade("São Paulo");
+        firstEvent.setUf("SP");
+        firstEvent.setCanceled(false);
+        eventRepository.save(firstEvent);
+
+        Event secondEvent = new Event();
+        secondEvent.setEventName("Another Event");
+        secondEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        secondEvent.setCep("01001000");
+        secondEvent.setLogradouro("Praça da Sé");
+        secondEvent.setBairro("Sé");
+        secondEvent.setCidade("São Paulo");
+        secondEvent.setUf("SP");
+        secondEvent.setCanceled(false);
+        Event savedSecondEvent = eventRepository.save(secondEvent);
+
+        String updateJson = "{"
+                + "\"eventName\":\"Existing Event\","
+                + "\"eventDate\":\"26/12/2025\","
+                + "\"cep\":\"01001000\""
+                + "}";
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(updateJson, headers);
+
+        String url = baseUrl + "/" + savedSecondEvent.getId();
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PUT, request,
+                String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Nome de Evento Duplicado"));
+        }
+    }
+
+    // ========================== CANCEL EVENT TESTS ==========================
+
+    @Test
+    @DisplayName("Should successfully cancel an active event")
+    void cancelEvent_ActiveEvent_ShouldReturnCanceledEvent() throws Exception {
+        Event activeEvent = new Event();
+        activeEvent.setEventName("Tech Conference 2025");
+        activeEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        activeEvent.setCep("01001000");
+        activeEvent.setLogradouro("Praça da Sé");
+        activeEvent.setBairro("Sé");
+        activeEvent.setCidade("São Paulo");
+        activeEvent.setUf("SP");
+        activeEvent.setCanceled(false);
+        Event savedEvent = eventRepository.save(activeEvent);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("\"canceled\":true"));
+            assertTrue(responseBody.contains("Tech Conference 2025"));
+        }
+
+        Event canceledEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(canceledEvent);
+        assertTrue(canceledEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when canceling non-existent event")
+    void cancelEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + nonExistentId + "/cancel";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 409 when trying to cancel already canceled event")
+    void cancelEvent_AlreadyCanceled_ShouldReturn409() throws Exception {
+        Event eventToCancel = new Event();
+        eventToCancel.setEventName("Conference to Cancel");
+        eventToCancel.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        eventToCancel.setCep("01001000");
+        eventToCancel.setLogradouro("Praça da Sé");
+        eventToCancel.setBairro("Sé");
+        eventToCancel.setCidade("São Paulo");
+        eventToCancel.setUf("SP");
+        eventToCancel.setCanceled(false);
+        Event savedEvent = eventRepository.save(eventToCancel);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request, String.class);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Já Cancelado") ||
+                    responseBody.contains("already cancelled") ||
+                    responseBody.contains("já cancelado"));
+        }
+    }
+
+    // ======= REACTIVATE EVENT TESTS =======
+
+    @Test
+    @DisplayName("Should reactivate canceled event successfully")
+    void reactivateEvent_CanceledEvent_ShouldReturn200() throws Exception {
+        Event event = new Event();
+        event.setEventName("Event to Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(true);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event to Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event reactivatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(reactivatedEvent);
+        assertFalse(reactivatedEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when reactivating non-existent event")
+    void reactivateEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String url = baseUrl + "/" + nonExistentId + "/reactivate";
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado") ||
+                    responseBody.contains("not found") ||
+                    responseBody.contains("não encontrado"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should reactivate already active event")
+    void reactivateEvent_ActiveEvent_ShouldReturn200() throws Exception {
+        Event event = new Event();
+        event.setEventName("Active Event to Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+        String url = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+
+        ResponseEntity<String> response = restTemplate.exchange(url, org.springframework.http.HttpMethod.PATCH, request,
+                String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Active Event to Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event stillActiveEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(stillActiveEvent);
+        assertFalse(stillActiveEvent.isCanceled());
+    }
+
+    @Test
+    @DisplayName("Should cancel and reactivate event successfully")
+    void cancelAndReactivateEvent_ShouldWork() throws Exception {
+        Event event = new Event();
+        event.setEventName("Event for Cancel and Reactivate");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        Event savedEvent = eventRepository.save(event);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        String cancelUrl = baseUrl + "/" + savedEvent.getId() + "/cancel";
+        ResponseEntity<String> cancelResponse = restTemplate.exchange(cancelUrl,
+                org.springframework.http.HttpMethod.PATCH, request, String.class);
+        assertEquals(HttpStatus.OK, cancelResponse.getStatusCode());
+
+        Event canceledEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(canceledEvent);
+        assertTrue(canceledEvent.isCanceled());
+
+        String reactivateUrl = baseUrl + "/" + savedEvent.getId() + "/reactivate";
+        ResponseEntity<String> reactivateResponse = restTemplate.exchange(reactivateUrl,
+                org.springframework.http.HttpMethod.PATCH, request, String.class);
+
+        assertEquals(HttpStatus.OK, reactivateResponse.getStatusCode());
+        assertNotNull(reactivateResponse.getBody());
+
+        String responseBody = reactivateResponse.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Event for Cancel and Reactivate"));
+            assertTrue(responseBody.contains("\"canceled\":false"));
+        }
+
+        Event reactivatedEvent = eventRepository.findById(savedEvent.getId()).orElse(null);
+        assertNotNull(reactivatedEvent);
+        assertFalse(reactivatedEvent.isCanceled());
+    }
+}

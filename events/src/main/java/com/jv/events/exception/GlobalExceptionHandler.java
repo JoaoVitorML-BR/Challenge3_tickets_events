@@ -115,6 +115,21 @@ public class GlobalExceptionHandler {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
         }
 
+        @ExceptionHandler(EventAlreadyCancelledException.class)
+        public ResponseEntity<ErrorResponseDTO> handleEventAlreadyCancelled(
+                        EventAlreadyCancelledException ex,
+                        WebRequest request) {
+                logger.warn("Evento já cancelado: {}", ex.getMessage());
+
+                ErrorResponseDTO error = new ErrorResponseDTO(
+                                HttpStatus.CONFLICT.value(),
+                                "Evento Já Cancelado",
+                                ex.getMessage(),
+                                request.getDescription(false).replace("uri=", ""));
+
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        }
+
         @ExceptionHandler(Exception.class)
         public ResponseEntity<ErrorResponseDTO> handleGeneral(Exception ex, WebRequest request) {
                 logger.error("Erro não tratado: {}", ex.getMessage(), ex);

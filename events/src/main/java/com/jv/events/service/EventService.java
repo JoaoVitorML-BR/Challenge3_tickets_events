@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.jv.events.client.TicketServiceClient;
 import com.jv.events.dto.TicketCheckResponseDTO;
+import com.jv.events.exception.EventAlreadyCancelledException;
 import com.jv.events.exception.EventCancellationNotAllowedException;
 import com.jv.events.exception.EventNameAlreadyExistsException;
 import com.jv.events.models.Event;
@@ -82,6 +83,10 @@ public class EventService {
         Optional<Event> eventOptional = getEventById(id);
         if (eventOptional.isPresent()) {
             Event event = eventOptional.get();
+
+            if (event.isCanceled()) {
+                throw new EventAlreadyCancelledException(id);
+            }
 
             try {
                 TicketCheckResponseDTO ticketCheck = ticketServiceClient.checkTicketsForEvent(id);
