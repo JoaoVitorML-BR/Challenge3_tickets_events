@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @DisplayName("Event Integration Tests")
-@SuppressWarnings("deprecation")
 public class EventIT {
 
     @LocalServerPort
@@ -284,6 +283,220 @@ public class EventIT {
         if (responseBody != null) {
             assertTrue(responseBody.contains("Active Event"));
             assertFalse(responseBody.contains("Canceled Event"));
+        }
+    }
+
+    // ========================== GET EVENT BY ID TESTS ==========================
+
+    @Test
+    @DisplayName("Should get event by ID successfully")
+    void getEventById_ValidId_ShouldReturnEvent() throws Exception {
+        Event savedEvent = new Event();
+        savedEvent.setEventName("Tech Meetup 2025");
+        savedEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        savedEvent.setCep("01001000");
+        savedEvent.setLogradouro("Praça da Sé");
+        savedEvent.setBairro("Sé");
+        savedEvent.setCidade("São Paulo");
+        savedEvent.setUf("SP");
+        savedEvent.setCanceled(false);
+        Event event = eventRepository.save(savedEvent);
+
+        String url = baseUrl + "/" + event.getId();
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Tech Meetup 2025"));
+            assertTrue(responseBody.contains("01001000"));
+            assertTrue(responseBody.contains("Praça da Sé"));
+            assertTrue(responseBody.contains("São Paulo"));
+            assertTrue(responseBody.contains(event.getId()));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 404 when getting event with non-existent ID")
+    void getEventById_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        String url = baseUrl + "/" + nonExistentId;
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+            assertTrue(responseBody.contains(nonExistentId));
+        }
+    }
+
+    @Test
+    @DisplayName("Should get canceled event by ID successfully")
+    void getEventById_CanceledEvent_ShouldReturnEvent() throws Exception {
+        Event savedEvent = new Event();
+        savedEvent.setEventName("Canceled Conference");
+        savedEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        savedEvent.setCep("01001000");
+        savedEvent.setLogradouro("Praça da Sé");
+        savedEvent.setBairro("Sé");
+        savedEvent.setCidade("São Paulo");
+        savedEvent.setUf("SP");
+        savedEvent.setCanceled(true);
+        Event event = eventRepository.save(savedEvent);
+
+        String url = baseUrl + "/" + event.getId();
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Canceled Conference"));
+            assertTrue(responseBody.contains("true"));
+            assertTrue(responseBody.contains(event.getId()));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return 400 when getting event with invalid ID format")
+    void getEventById_InvalidIdFormat_ShouldReturn400OrError() throws Exception {
+        String invalidId = "invalid-id-format";
+
+        String url = baseUrl + "/" + invalidId;
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertTrue(response.getStatusCode().is4xxClientError() || response.getStatusCode().is5xxServerError());
+        assertNotNull(response.getBody());
+    }
+
+    // ========================== SEARCH EVENTS BY NAME TESTS ==========================
+
+    @Test
+    @DisplayName("Should search events by name without pagination")
+    void searchEventsByName_WithoutPagination_ShouldReturnMatchingEvents() throws Exception {
+        Event techEvent = new Event();
+        techEvent.setEventName("Tech Conference 2025");
+        techEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        techEvent.setCep("01001000");
+        techEvent.setLogradouro("Praça da Sé");
+        techEvent.setBairro("Sé");
+        techEvent.setCidade("São Paulo");
+        techEvent.setUf("SP");
+        techEvent.setCanceled(false);
+        eventRepository.save(techEvent);
+
+        Event musicEvent = new Event();
+        musicEvent.setEventName("Music Festival 2025");
+        musicEvent.setEventDate(java.time.LocalDate.of(2025, 12, 26));
+        musicEvent.setCep("01001000");
+        musicEvent.setLogradouro("Praça da Sé");
+        musicEvent.setBairro("Sé");
+        musicEvent.setCidade("São Paulo");
+        musicEvent.setUf("SP");
+        musicEvent.setCanceled(false);
+        eventRepository.save(musicEvent);
+
+        String url = baseUrl + "/search?name=Tech";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Tech Conference 2025"));
+            assertFalse(responseBody.contains("Music Festival 2025"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should search events by name with pagination")
+    void searchEventsByName_WithPagination_ShouldReturnPagedResults() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            Event event = new Event();
+            event.setEventName("Conference " + i);
+            event.setEventDate(java.time.LocalDate.of(2025, 12, i + 20));
+            event.setCep("01001000");
+            event.setLogradouro("Praça da Sé");
+            event.setBairro("Sé");
+            event.setCidade("São Paulo");
+            event.setUf("SP");
+            event.setCanceled(false);
+            eventRepository.save(event);
+        }
+
+        String url = baseUrl + "/search?name=Conference&page=0&size=3";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Conference"));
+            assertTrue(responseBody.contains("totalPages"));
+            assertTrue(responseBody.contains("totalElements"));
+            assertTrue(responseBody.contains("hasNext"));
+            assertTrue(responseBody.contains("hasPrevious"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no events match search term")
+    void searchEventsByName_NoMatches_ShouldReturnEmptyList() throws Exception {
+        Event event = new Event();
+        event.setEventName("Tech Conference 2025");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        eventRepository.save(event);
+
+        String url = baseUrl + "/search?name=NonExistentEvent";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("[]") || responseBody.contains("\"events\":[]"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should search events case-insensitively")
+    void searchEventsByName_CaseInsensitive_ShouldReturnMatchingEvents() throws Exception {
+        Event event = new Event();
+        event.setEventName("TECH Conference 2025");
+        event.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        event.setCep("01001000");
+        event.setLogradouro("Praça da Sé");
+        event.setBairro("Sé");
+        event.setCidade("São Paulo");
+        event.setUf("SP");
+        event.setCanceled(false);
+        eventRepository.save(event);
+
+        String url = baseUrl + "/search?name=tech";
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("TECH Conference 2025"));
         }
     }
 }
