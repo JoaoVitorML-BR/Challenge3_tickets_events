@@ -95,4 +95,89 @@ public class EventIT {
         assertEquals("01001000", savedEvent.getCep());
         assertFalse(savedEvent.isCanceled());
     }
+
+    // ========================== EXCEPTION TESTS ==========================
+
+    @Test
+    @DisplayName("Should return 400 when CEP is invalid")
+    void createEvent_InvalidCep_ShouldReturn400() throws Exception {
+        // Given
+        EventCreateDTO createDTO = new EventCreateDTO();
+        createDTO.setEventName("Tech Conference 2025");
+        createDTO.setEventDate("25/12/2025");
+        createDTO.setCep("00000000");
+
+        ViaCepResponse invalidCepResponse = new ViaCepResponse();
+        invalidCepResponse.setErro(true);
+        when(viaCepClient.buscarCep(anyString())).thenReturn(invalidCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(createDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("CEP Inválido"));
+        }
+
+        assertEquals(0, eventRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 409 when event name already exists")
+    void createEvent_DuplicateName_ShouldReturn409() throws Exception {
+        Event existingEvent = new Event();
+        existingEvent.setEventName("Tech Conference 2025");
+        existingEvent.setEventDate(java.time.LocalDate.of(2025, 12, 25));
+        existingEvent.setCep("01001000");
+        existingEvent.setLogradouro("Praça da Sé");
+        existingEvent.setBairro("Sé");
+        existingEvent.setCidade("São Paulo");
+        existingEvent.setUf("SP");
+        eventRepository.save(existingEvent);
+
+        EventCreateDTO createDTO = new EventCreateDTO();
+        createDTO.setEventName("Tech Conference 2025");
+        createDTO.setEventDate("25/12/2025");
+        createDTO.setCep("01001000");
+
+        when(viaCepClient.buscarCep(anyString())).thenReturn(validViaCepResponse);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<EventCreateDTO> request = new HttpEntity<>(createDTO, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl, request, String.class);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Nome de Evento Duplicado"));
+        }
+
+        assertEquals(1, eventRepository.count());
+    }
+
+    @Test
+    @DisplayName("Should return 404 when event not found")
+    void getEvent_NonExistentId_ShouldReturn404() throws Exception {
+        String nonExistentId = "507f1f77bcf86cd799439011";
+
+        ResponseEntity<String> response = restTemplate.getForEntity(baseUrl + "/" + nonExistentId, String.class);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        String responseBody = response.getBody();
+        if (responseBody != null) {
+            assertTrue(responseBody.contains("Evento Não Encontrado"));
+        }
+    }
 }
