@@ -18,6 +18,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/test/**").permitAll()
                         .requestMatchers("/api/events/**").permitAll()
                         .requestMatchers("/api/v1/events/**").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml",
+                                "/api-docs/**")
+                        .permitAll()
+                        .requestMatchers("/webjars/**").permitAll()
                         .anyRequest().authenticated());
         return http.build();
     }
