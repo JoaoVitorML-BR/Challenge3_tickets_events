@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jv.events.client.ViaCepClient;
+import com.jv.events.dto.ErrorResponseDTO;
 import com.jv.events.dto.EventCreateDTO;
 import com.jv.events.dto.EventResponseDTO;
 import com.jv.events.dto.EventUpdateDTO;
@@ -20,6 +21,13 @@ import com.jv.events.mapper.EventMapper;
 import com.jv.events.models.Event;
 import com.jv.events.service.EventService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
@@ -41,6 +49,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import jakarta.validation.Valid;
 
+@Tag(name = "Events", description = "API for managing events")
 @RestController
 @RequestMapping("/api/v1/events")
 @RequiredArgsConstructor
@@ -49,24 +58,30 @@ public class EventController {
     private final EventService eventService;
     private final ViaCepClient viaCepClient;
 
+    @Operation(summary = "Get all events", description = "Retrieves all events with optional filtering and pagination")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Events retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PagedEventResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @GetMapping
     public ResponseEntity<?> getAllEvents(
-            @RequestParam(value = "canceled", required = false) Boolean canceled,
-            @RequestParam(value = "page", required = false) Integer page,
-            @RequestParam(value = "size", defaultValue = "10") int size,
-            @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
-            @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
+            @Parameter(description = "Filter by canceled status") @RequestParam(value = "canceled", required = false) Boolean canceled,
+            @Parameter(description = "Page number for pagination") @RequestParam(value = "page", required = false) Integer page,
+            @Parameter(description = "Page size") @RequestParam(value = "size", defaultValue = "10") int size,
+            @Parameter(description = "Sort field") @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
+            @Parameter(description = "Sort direction (ASC or DESC)") @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
         try {
             if (page != null) {
                 Sort.Direction sortDirection = Sort.Direction.fromString(direction);
                 Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-                
+
                 Page<Event> eventPage = eventService.getEventsPaginated(canceled, pageable);
-                
+
                 List<EventResponseDTO> events = eventPage.getContent().stream()
                         .map(EventMapper::toResponseDTO)
                         .collect(Collectors.toList());
-                
+
                 PagedEventResponseDTO response = new PagedEventResponseDTO(
                         events,
                         eventPage.getNumber(),
@@ -74,12 +89,10 @@ public class EventController {
                         eventPage.getTotalElements(),
                         eventPage.getSize(),
                         eventPage.hasNext(),
-                        eventPage.hasPrevious()
-                );
-                
+                        eventPage.hasPrevious());
+
                 return ResponseEntity.ok(response);
-            } 
-            else {
+            } else {
                 List<Event> events = eventService.getEventsByStatus(canceled);
                 List<EventResponseDTO> response = events.stream()
                         .map(EventMapper::toResponseDTO)
@@ -92,8 +105,14 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Get event by ID", description = "Retrieves a specific event by its ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = EventResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Event not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<EventResponseDTO> getEventById(@PathVariable String id) {
+    public ResponseEntity<EventResponseDTO> getEventById(@Parameter(description = "Event ID") @PathVariable String id) {
         try {
             Event event = eventService.getEventById(id)
                     .orElseThrow(() -> new EventNotFoundException(id));
@@ -107,24 +126,30 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Search events by name", description = "Searches for events by name with optional pagination")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Events found successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PagedEventResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid search parameters", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @GetMapping("/search")
     public ResponseEntity<?> searchEventsByName(
-            @RequestParam(value = "name", required = true) String name,
-            @RequestParam(value = "page", required = false) Integer page,
-            @RequestParam(value = "size", defaultValue = "10") int size,
-            @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
-            @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
+            @Parameter(description = "Event name to search for", required = true) @RequestParam(value = "name", required = true) String name,
+            @Parameter(description = "Page number for pagination") @RequestParam(value = "page", required = false) Integer page,
+            @Parameter(description = "Page size") @RequestParam(value = "size", defaultValue = "10") int size,
+            @Parameter(description = "Sort field") @RequestParam(value = "sort", defaultValue = "eventDate") String sortBy,
+            @Parameter(description = "Sort direction (ASC or DESC)") @RequestParam(value = "direction", defaultValue = "ASC") String direction) {
         try {
             if (page != null) {
                 Sort.Direction sortDirection = Sort.Direction.fromString(direction);
                 Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-                
+
                 Page<Event> eventPage = eventService.searchEventsByNamePaginated(name, pageable);
-                
+
                 List<EventResponseDTO> events = eventPage.getContent().stream()
                         .map(EventMapper::toResponseDTO)
                         .collect(Collectors.toList());
-                
+
                 PagedEventResponseDTO response = new PagedEventResponseDTO(
                         events,
                         eventPage.getNumber(),
@@ -132,12 +157,10 @@ public class EventController {
                         eventPage.getTotalElements(),
                         eventPage.getSize(),
                         eventPage.hasNext(),
-                        eventPage.hasPrevious()
-                );
-                
+                        eventPage.hasPrevious());
+
                 return ResponseEntity.ok(response);
-            } 
-            else {
+            } else {
                 List<Event> events = eventService.searchEventsByName(name);
                 List<EventResponseDTO> response = events.stream()
                         .map(EventMapper::toResponseDTO)
@@ -150,9 +173,17 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Update event", description = "Updates an existing event by its ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = EventResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid CEP or request data", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Event not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "Event name already exists", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @PutMapping("/{id}")
     public ResponseEntity<EventResponseDTO> updateEvent(
-            @PathVariable String id,
+            @Parameter(description = "Event ID") @PathVariable String id,
             @Valid @RequestBody EventUpdateDTO eventUpdateDTO) {
         try {
             Event existingEvent = eventService.getEventById(id)
@@ -180,8 +211,16 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Cancel event", description = "Cancels an event by its ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event cancelled successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = EventResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Event cancellation not allowed", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Event not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "Event already cancelled", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<EventResponseDTO> cancelEvent(@PathVariable String id) {
+    public ResponseEntity<EventResponseDTO> cancelEvent(@Parameter(description = "Event ID") @PathVariable String id) {
         try {
             Event canceledEvent = eventService.cancelEvent(id);
 
@@ -198,8 +237,15 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Reactivate event", description = "Reactivates a cancelled event by its ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event reactivated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = EventResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Event not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @PatchMapping("/{id}/reactivate")
-    public ResponseEntity<EventResponseDTO> reactivateEvent(@PathVariable String id) {
+    public ResponseEntity<EventResponseDTO> reactivateEvent(
+            @Parameter(description = "Event ID") @PathVariable String id) {
         try {
             Event reactivatedEvent = eventService.reactivateEvent(id);
 
@@ -216,6 +262,13 @@ public class EventController {
         }
     }
 
+    @Operation(summary = "Create event", description = "Creates a new event")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Event created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = EventResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid CEP or request data", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "Event name already exists", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
     @PostMapping
     public ResponseEntity<EventResponseDTO> createEvent(@Valid @RequestBody EventCreateDTO eventCreateDTO) {
 
