@@ -20,39 +20,48 @@ import com.jv.ticket.user.jwt.JwtAuthorizationFilter;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        @Bean
+        public BCryptPasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
-            throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
+        @Bean
+        public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+                        throws Exception {
+                return authenticationConfiguration.getAuthenticationManager();
+        }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http.csrf(csrf -> csrf.disable())
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/check").permitAll()
-                        .requestMatchers("/webjars/**").permitAll()
-                        .anyRequest().authenticated())
-                .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(
-                        jwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint()))
-                .build();
-    }
+        @Bean
+        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                return http.csrf(csrf -> csrf.disable())
+                                .formLogin(form -> form.disable())
+                                .httpBasic(basic -> basic.disable())
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
+                                                .requestMatchers(HttpMethod.POST, "/api/v1/auth").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/v1/tickets/event/*/check")
+                                                .permitAll()
+                                                .requestMatchers(
+                                                                "/swagger-ui/**",
+                                                                "/swagger-ui.html",
+                                                                "/v3/api-docs/**",
+                                                                "/v3/api-docs.yaml",
+                                                                "/api-docs/**")
+                                                .permitAll()
+                                                .requestMatchers("/webjars/**").permitAll()
+                                                .anyRequest().authenticated())
+                                .sessionManagement(
+                                                session -> session
+                                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .addFilterBefore(
+                                                jwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class)
+                                .exceptionHandling(ex -> ex
+                                                .authenticationEntryPoint(new JwtAuthenticationEntryPoint()))
+                                .build();
+        }
 
-    @Bean
-    public JwtAuthorizationFilter jwtAuthorizationFilter() {
-        return new JwtAuthorizationFilter();
-    }
+        @Bean
+        public JwtAuthorizationFilter jwtAuthorizationFilter() {
+                return new JwtAuthorizationFilter();
+        }
 }
