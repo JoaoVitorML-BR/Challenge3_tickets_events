@@ -10,7 +10,7 @@ import com.jv.ticket.ticket.dto.EventPageResponseDTO;
 
 @FeignClient(
     name = "event-service",
-    url = "http://ec2-18-222-140-58.us-east-2.compute.amazonaws.com:8080",
+    url = "http://ec2-13-58-194-161.us-east-2.compute.amazonaws.com:8080",
     fallback = EventServiceFallback.class
 )
 public interface EventServiceClient {
